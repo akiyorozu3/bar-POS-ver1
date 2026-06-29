@@ -4,16 +4,17 @@ import OrderScreen from '@/components/OrderScreen'
 import CheckoutScreen from '@/components/CheckoutScreen'
 import SalesScreen from '@/components/SalesScreen'
 import MenuManageScreen from '@/components/MenuManageScreen'
+import CastManageScreen from '@/components/CastManageScreen'
 import LoginScreen from '@/components/LoginScreen'
 
-type Screen = 'order' | 'checkout' | 'sales' | 'menu'
+type Screen = 'order' | 'checkout' | 'sales' | 'menu' | 'cast'
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('order')
   const {
     user, role, authReady,
     initAuth, signOutUser,
-    subscribeMenus, loadFeeSettings, currentSeatId, orders,
+    subscribeMenus, subscribeCasts, loadFeeSettings, currentSeatId, orders,
   } = usePosStore()
 
   const isOwner = role === 'owner'
@@ -24,17 +25,18 @@ export default function App() {
     return unsub
   }, [initAuth])
 
-  // ログイン後にメニューと設定を購読・ロード（Firestoreは認証必須）
+  // ログイン後にメニュー・キャスト・設定を購読・ロード（Firestoreは認証必須）
   useEffect(() => {
     if (!user) return
-    const unsub = subscribeMenus()
+    const unsubMenus = subscribeMenus()
+    const unsubCasts = subscribeCasts()
     loadFeeSettings()
-    return unsub
-  }, [user, subscribeMenus, loadFeeSettings])
+    return () => { unsubMenus(); unsubCasts() }
+  }, [user, subscribeMenus, subscribeCasts, loadFeeSettings])
 
   // 権限が変わったら、許可されない画面からは注文入力に戻す
   useEffect(() => {
-    if (!isOwner && (screen === 'sales' || screen === 'menu')) setScreen('order')
+    if (!isOwner && (screen === 'sales' || screen === 'menu' || screen === 'cast')) setScreen('order')
   }, [isOwner, screen])
 
   // 会計へ遷移イベント（OrderScreen から発火）
@@ -98,6 +100,14 @@ export default function App() {
             <i className="ti ti-list-details" aria-hidden /> メニュー管理
           </button>
         )}
+        {isOwner && (
+          <button
+            className={`nav-btn ${screen === 'cast' ? 'active' : ''}`}
+            onClick={() => setScreen('cast')}
+          >
+            <i className="ti ti-users" aria-hidden /> キャスト管理
+          </button>
+        )}
       </nav>
 
       {/* 画面 */}
@@ -108,6 +118,7 @@ export default function App() {
         )}
         {screen === 'sales' && isOwner && <SalesScreen />}
         {screen === 'menu' && isOwner && <MenuManageScreen />}
+        {screen === 'cast' && isOwner && <CastManageScreen />}
       </main>
     </div>
   )

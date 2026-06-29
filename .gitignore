@@ -4,6 +4,9 @@ node_modules
 # ビルド成果物
 dist
 
+# Firebase（デプロイ用キャッシュ）
+.firebase
+
 # 環境変数（Firebase キーが含まれるため必ずgit管理から除外）
 .env
 .env.local

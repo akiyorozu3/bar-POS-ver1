@@ -19,5 +19,6 @@ export const auth = getAuth(app)
 export const COLLECTIONS = {
   TRANSACTIONS: 'transactions',
   MENUS: 'menus',
+  CASTS: 'casts',
   SETTINGS: 'settings',
 } as const

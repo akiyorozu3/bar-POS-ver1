@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { usePosStore, CAST_LIST } from '@/store/posStore'
+import { usePosStore } from '@/store/posStore'
 import { toTaxInc } from '@/lib/tax'
 import { FREE_PRESETS, MENU_CATEGORIES } from '@/lib/defaultMenus'
 import type { MenuItem } from '@/types'
@@ -10,7 +10,7 @@ export default function OrderScreen() {
   const {
     seats, currentSeatId, orders,
     addSeat, updateSeat, setCurrentSeat,
-    menus, addOrderItem, changeQty, changeItemCast, clearOrder,
+    menus, casts, addOrderItem, changeQty, changeItemCast, clearOrder,
   } = usePosStore()
 
   const [tab, setTab] = useState<Tab>('ウイスキー')
@@ -189,7 +189,7 @@ export default function OrderScreen() {
                 onChange={(e) => seat && updateSeat(seat.id, { defaultCast: e.target.value })}
               >
                 <option value="">担当未設定</option>
-                {CAST_LIST.map((c) => <option key={c}>{c}</option>)}
+                {casts.map((c) => <option key={c.id}>{c.name}</option>)}
               </select>
             </div>
           </div>
@@ -221,7 +221,7 @@ export default function OrderScreen() {
                       onChange={(e) => currentSeatId && changeItemCast(currentSeatId, item.id, e.target.value)}
                     >
                       <option value="">未設定</option>
-                      {CAST_LIST.map((c) => <option key={c}>{c}</option>)}
+                      {casts.map((c) => <option key={c.id}>{c.name}</option>)}
                     </select>
                   </div>
                 </div>

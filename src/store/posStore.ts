@@ -32,10 +32,10 @@ import { db, auth, COLLECTIONS } from '@/lib/firebase'
 import { idToEmail, emailToRole } from '@/lib/authConfig'
 import { calcTax, calcFee } from '@/lib/tax'
 import { DEFAULT_MENUS } from '@/lib/defaultMenus'
-import type { Seat, OrderItem, MenuItem, Transaction, FeeSettings, PayMethod, Role } from '@/types'
+import type { Seat, OrderItem, MenuItem, Cast, Transaction, FeeSettings, PayMethod, Role } from '@/types'
 
-// キャスト一覧（将来的にFirestoreで管理してもよい）
-export const CAST_LIST = ['さくら', 'あおい', 'ひなた', 'れいな']
+// 初期投入用のデフォルトキャスト（実データは Firestore で管理）
+export const DEFAULT_CASTS = ['さくら', 'あおい', 'ひなた', 'れいな']
 export const BACK_RATE = Number(import.meta.env.VITE_BACK_RATE ?? 0.30)
 
 interface PosState {
@@ -57,6 +57,10 @@ interface PosState {
   menus: MenuItem[]
   menusLoading: boolean
 
+  // キャスト（Firestoreからリアルタイム購読）
+  casts: Cast[]
+  castsLoading: boolean
+
   // 取引履歴（Firestoreからリアルタイム購読）
   transactions: Transaction[]
   transactionsLoading: boolean
@@ -74,6 +78,13 @@ interface PosState {
   updateMenu: (id: string, patch: Partial<Omit<MenuItem, 'id'>>) => Promise<void>
   deleteMenu: (id: string) => Promise<void>
   seedDefaultMenus: () => Promise<void>
+
+  // キャスト管理（オーナーのみ）
+  subscribeCasts: () => () => void
+  addCast: (name: string) => Promise<void>
+  updateCast: (id: string, name: string) => Promise<void>
+  deleteCast: (id: string) => Promise<void>
+  seedDefaultCasts: () => Promise<void>
 
   // アクション
   addSeat: (name: string, solo: boolean) => void
@@ -118,6 +129,8 @@ export const usePosStore = create<PosState>((set, get) => ({
   orders: { A: [], B: [], C: [] },
   menus: [],
   menusLoading: true,
+  casts: [],
+  castsLoading: true,
   transactions: [],
   transactionsLoading: true,
   feeSettings: { card: 3.25, qr: 1.98 },
@@ -168,6 +181,38 @@ export const usePosStore = create<PosState>((set, get) => ({
     const batch = writeBatch(db)
     DEFAULT_MENUS.forEach((m) => {
       batch.set(doc(collection(db, COLLECTIONS.MENUS)), m)
+    })
+    await batch.commit()
+  },
+
+  // ── キャスト管理（オーナーのみ／ルールでも保護） ──
+  subscribeCasts: () => {
+    set({ castsLoading: true })
+    const q = query(collection(db, COLLECTIONS.CASTS), orderBy('sortOrder'))
+    const unsub = onSnapshot(q, (snap) => {
+      const casts = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Cast))
+      set({ casts, castsLoading: false })
+    })
+    return unsub
+  },
+
+  addCast: async (name) => {
+    const sortOrder = get().casts.reduce((max, c) => Math.max(max, c.sortOrder), 0) + 1
+    await addDoc(collection(db, COLLECTIONS.CASTS), { name, sortOrder })
+  },
+
+  updateCast: async (id, name) => {
+    await updateDoc(doc(db, COLLECTIONS.CASTS, id), { name })
+  },
+
+  deleteCast: async (id) => {
+    await deleteDoc(doc(db, COLLECTIONS.CASTS, id))
+  },
+
+  seedDefaultCasts: async () => {
+    const batch = writeBatch(db)
+    DEFAULT_CASTS.forEach((name, i) => {
+      batch.set(doc(collection(db, COLLECTIONS.CASTS)), { name, sortOrder: (i + 1) * 10 })
     })
     await batch.commit()
   },

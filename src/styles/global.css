@@ -254,3 +254,4 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .mm-row-save:disabled { opacity: .4; cursor: not-allowed; border-color: #ccc; color: #888780; }
 .mm-row-del { font-size: 11px; padding: 5px 10px; border-radius: 6px; border: 0.5px solid #d8a3a3; background: #fff; color: #a32d2d; cursor: pointer; font-family: inherit; }
 .mm-row-del:disabled { opacity: .5; cursor: not-allowed; }
+.mm-note { font-size: 10px; color: #888780; line-height: 1.7; padding: 4px 2px; }

@@ -18,6 +18,13 @@ export interface OrderItem {
   isFree: boolean      // フリー入力フラグ
 }
 
+// ── キャスト ─────────────────────────────────────
+export interface Cast {
+  id: string
+  name: string
+  sortOrder: number
+}
+
 // ── メニュー ─────────────────────────────────────
 export interface MenuItem {
   id: string

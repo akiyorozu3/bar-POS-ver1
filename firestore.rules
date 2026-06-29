@@ -19,6 +19,12 @@ service cloud.firestore {
       allow write: if isOwner();
     }
 
+    // キャスト：ログイン済みは閲覧可（注文画面の担当選択に必要） / 編集はオーナーのみ
+    match /casts/{id} {
+      allow read: if isAuthed();
+      allow write: if isOwner();
+    }
+
     // 手数料設定：ログイン済みは閲覧可（会計計算に必要） / 変更はオーナーのみ
     match /settings/{id} {
       allow read: if isAuthed();

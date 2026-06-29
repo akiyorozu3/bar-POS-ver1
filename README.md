@@ -148,7 +148,8 @@ src/
 │   ├── OrderScreen.tsx     # 注文入力画面
 │   ├── CheckoutScreen.tsx  # 会計画面
 │   ├── SalesScreen.tsx     # 売上管理画面（オーナー）
-│   └── MenuManageScreen.tsx# メニュー管理画面（オーナー）
+│   ├── MenuManageScreen.tsx# メニュー管理画面（オーナー）
+│   └── CastManageScreen.tsx# キャスト管理画面（オーナー）
 ├── hooks/
 │   └── useSalesSummary.ts  # 売上集計ロジック
 ├── lib/
@@ -167,11 +168,16 @@ src/
 └── main.tsx                # エントリーポイント
 ```
 
-## キャスト・バック率の変更
+## キャストの変更
 
-`src/store/posStore.ts` の冒頭を編集してください：
+**オーナーでログイン → 「キャスト管理」画面** から、キャストの追加・名前変更・削除が行えます。  
+初回はキャストが空のときに表示される「初期キャストを投入」ボタンで、既定のキャスト  
+（[`src/store/posStore.ts`](src/store/posStore.ts) の `DEFAULT_CASTS`）を一括登録できます。
 
-```ts
-export const CAST_LIST = ['さくら', 'あおい', 'ひなた', 'れいな']  // キャスト名
-export const BACK_RATE = 0.30  // バック率（.env の VITE_BACK_RATE でも設定可）
-```
+- キャストを削除しても、過去の売上・バック集計には影響しません（記録された担当名はそのまま残ります）
+- 名前を変更した場合、変更後の注文から新しい名前が使われます
+
+## バック率の変更
+
+バック率は `.env` の `VITE_BACK_RATE`（例 `0.30` = 30%）で設定します。  
+未設定の場合は `src/store/posStore.ts` の `BACK_RATE` の既定値（0.30）が使われます。
