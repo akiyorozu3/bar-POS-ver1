@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ログイン済みか
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    // オーナーか（ログインIDが owner のアカウント）
+    // ※ VITE_OWNER_ID / VITE_AUTH_ID_DOMAIN を変えた場合はここも合わせること
+    function isOwner() {
+      return isAuthed() && request.auth.token.email == 'owner@bar-pos.local';
+    }
+
+    // メニュー：ログイン済みは閲覧可 / 追加・編集・削除はオーナーのみ
+    match /menus/{id} {
+      allow read: if isAuthed();
+      allow write: if isOwner();
+    }
+
+    // 手数料設定：ログイン済みは閲覧可（会計計算に必要） / 変更はオーナーのみ
+    match /settings/{id} {
+      allow read: if isAuthed();
+      allow write: if isOwner();
+    }
+
+    // 取引（売上）：スタッフは「会計の確定（作成）」のみ可能。
+    // 売上の閲覧・修正・削除はオーナーのみ（＝スタッフは過去売上を一切見られない）
+    match /transactions/{id} {
+      allow create: if isAuthed();
+      allow read, update, delete: if isOwner();
+    }
+  }
+}
