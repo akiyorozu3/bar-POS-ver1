@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { usePosStore } from '@/store/posStore'
-import { toTaxInc, calcTax, calcFee } from '@/lib/tax'
+import { calcTax, calcFee } from '@/lib/tax'
 import type { PayMethod } from '@/types'
 
 const PAY_DEFS: { k: PayMethod; label: string; icon: string }[] = [
@@ -70,12 +70,12 @@ export default function CheckoutScreen({ onBack }: Props) {
               <span className="co-row-name">{x.name} × {x.qty}</span>
               <span className="co-row-cast">{x.cast}</span>
               <span className="co-row-price">
-                ¥{toTaxInc(x.priceExTax * x.qty).toLocaleString()}
+                ¥{(x.priceExTax * x.qty).toLocaleString()}
               </span>
             </div>
           ))}
           <div className="co-subtotal">
-            <span>小計</span><span>¥{subtotal.toLocaleString()}</span>
+            <span>小計 (税抜)</span><span>¥{subtotal.toLocaleString()}</span>
           </div>
           <div className="co-tax">
             <span>消費税 (10%)</span><span>¥{taxAmt.toLocaleString()}</span>

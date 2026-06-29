@@ -41,7 +41,7 @@ export function buildTransactionCSV(transactions: Transaction[]): string {
 
 /** キャストバック集計CSVを生成 */
 export function buildCastCSV(summary: SalesSummary): string {
-  const headers = ['キャスト', '担当件数', '売上合計', 'バック額']
+  const headers = ['キャスト', '担当件数', '売上合計(税抜)', 'バック額']
   const rows = summary.castSummaries.map((c) => [
     c.name,
     c.txCount,

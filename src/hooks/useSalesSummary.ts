@@ -14,7 +14,9 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
       PAY_METHODS.map((m) => [m, { count: 0, sales: 0, fee: 0, net: 0 }])
     ) as SalesSummary['byMethod']
 
+    // キャスト別の集計。salesAmount は税抜売上（バック基準）。
     const castMap: Record<string, { txCount: number; salesAmount: number }> = {}
+    const UNASSIGNED = '未設定'
 
     let totalSales = 0
     let totalFee = 0
@@ -31,13 +33,16 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
       m.fee += t.feeAmount
       m.net += t.netAmount
 
-      if (t.primaryCast) {
-        if (!castMap[t.primaryCast]) {
-          castMap[t.primaryCast] = { txCount: 0, salesAmount: 0 }
-        }
-        castMap[t.primaryCast].txCount++
-        castMap[t.primaryCast].salesAmount += t.total
+      // 品目ごとの担当キャストで税抜売上を按分する
+      const castsInTx = new Set<string>()
+      for (const item of t.items) {
+        const cast = item.cast || UNASSIGNED
+        if (!castMap[cast]) castMap[cast] = { txCount: 0, salesAmount: 0 }
+        castMap[cast].salesAmount += item.priceExTax * item.qty
+        castsInTx.add(cast)
       }
+      // 1取引につき、関与した各キャストの担当件数を1ずつ加算
+      for (const cast of castsInTx) castMap[cast].txCount++
     }
 
     const totalNet = totalSales - totalFee
@@ -49,7 +54,8 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
         name,
         txCount: v.txCount,
         salesAmount: v.salesAmount,
-        backAmount: Math.round(v.salesAmount * BACK_RATE),
+        // 担当未設定の売上はバック対象外（誰にも支払わない）
+        backAmount: name === UNASSIGNED ? 0 : Math.round(v.salesAmount * BACK_RATE),
       }))
       .sort((a, b) => b.salesAmount - a.salesAmount)
 

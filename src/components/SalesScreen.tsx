@@ -203,7 +203,7 @@ export default function SalesScreen() {
           <div className="section-title">キャストバック集計</div>
           <div className="cast-table">
             <div className="cast-head">
-              <span>キャスト</span><span>件数</span><span>売上</span><span>バック</span>
+              <span>キャスト</span><span>件数</span><span>売上(税抜)</span><span>バック</span>
             </div>
             {summary.castSummaries.map((c) => (
               <div key={c.name} className="cast-row-item">

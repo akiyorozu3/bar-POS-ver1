@@ -210,7 +210,7 @@ export default function OrderScreen() {
                       <button className="qb" onClick={() => currentSeatId && changeQty(currentSeatId, item.id, +1)}>＋</button>
                     </span>
                     <span className="t-row-price">
-                      ¥{toTaxInc(item.priceExTax * item.qty).toLocaleString()}
+                      ¥{(item.priceExTax * item.qty).toLocaleString()}
                     </span>
                   </div>
                   <div className="t-cast-row">
@@ -231,7 +231,7 @@ export default function OrderScreen() {
 
           <div className="ticket-foot">
             <div className="foot-line">
-              <span className="foot-lbl">小計</span>
+              <span className="foot-lbl">小計 (税抜)</span>
               <span className="foot-val">¥{subtotal.toLocaleString()}</span>
             </div>
             <div className="foot-line">
