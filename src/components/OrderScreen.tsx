@@ -13,7 +13,7 @@ export default function OrderScreen() {
     menus, casts, addOrderItem, changeQty, changeItemCast, clearOrder,
   } = usePosStore()
 
-  const [tab, setTab] = useState<Tab>('ウイスキー')
+  const [tab, setTab] = useState<Tab>('セット')
   const [showTodayModal, setShowTodayModal] = useState(false)
   const [freeName, setFreeName] = useState('')
   const [freePrice, setFreePrice] = useState('')
@@ -146,6 +146,12 @@ export default function OrderScreen() {
               本日メニューがまだ登録されていません。
               <br />
               「本日メニュー編集」から追加してください。
+            </div>
+          ) : tabMenus.length === 0 ? (
+            <div className="empty-today">
+              「{tab}」のメニューはまだ登録されていません。
+              <br />
+              オーナーの「メニュー管理」から追加できます。
             </div>
           ) : (
             <div className="menu-grid">
