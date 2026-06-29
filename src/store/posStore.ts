@@ -68,6 +68,9 @@ interface PosState {
   // 手数料設定
   feeSettings: FeeSettings
 
+  // バック率（0.30 = 30%）
+  backRate: number
+
   // 認証アクション
   initAuth: () => () => void
   signIn: (id: string, password: string) => Promise<void>
@@ -107,6 +110,9 @@ interface PosState {
 
   saveFeeSettings: (settings: FeeSettings) => Promise<void>
   loadFeeSettings: () => Promise<void>
+
+  saveBackRate: (rate: number) => Promise<void>
+  loadBackRate: () => Promise<void>
 }
 
 let seatCounter = 0
@@ -134,6 +140,7 @@ export const usePosStore = create<PosState>((set, get) => ({
   transactions: [],
   transactionsLoading: true,
   feeSettings: { card: 3.25, qr: 1.98 },
+  backRate: BACK_RATE,
 
   // ── 認証 ─────────────────────────────────────
   initAuth: () => {
@@ -372,6 +379,19 @@ export const usePosStore = create<PosState>((set, get) => ({
     const snap = await getDoc(doc(db, COLLECTIONS.SETTINGS, 'fees'))
     if (snap.exists()) {
       set({ feeSettings: snap.data() as FeeSettings })
+    }
+  },
+
+  // ── バック率の永続化 ───────────────────────────
+  saveBackRate: async (rate) => {
+    set({ backRate: rate })
+    await setDoc(doc(db, COLLECTIONS.SETTINGS, 'back'), { rate })
+  },
+
+  loadBackRate: async () => {
+    const snap = await getDoc(doc(db, COLLECTIONS.SETTINGS, 'back'))
+    if (snap.exists()) {
+      set({ backRate: (snap.data() as { rate: number }).rate })
     }
   },
 }))

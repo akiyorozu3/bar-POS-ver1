@@ -28,12 +28,14 @@ function periodRange(period: Period): [Date, Date] {
 }
 
 export default function SalesScreen() {
-  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings } = usePosStore()
+  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, saveBackRate } = usePosStore()
   const [period, setPeriod] = useState<Period>('today')
   const [showFeePanel, setShowFeePanel] = useState(false)
   const [showSyncPanel, setShowSyncPanel] = useState(false)
   const [cardFee, setCardFee] = useState(String(feeSettings.card))
   const [qrFee, setQrFee] = useState(String(feeSettings.qr))
+  const [backPct, setBackPct] = useState(String(Math.round(backRate * 100)))
+  const [feeSaved, setFeeSaved] = useState(false)
 
   // 期間が変わるたびに購読し直す
   useEffect(() => {
@@ -44,8 +46,18 @@ export default function SalesScreen() {
 
   const summary = useSalesSummary(transactions)
 
+  // 設定が非同期で読み込まれたら入力欄に反映
+  useEffect(() => { setBackPct(String(Math.round(backRate * 100))) }, [backRate])
+  useEffect(() => { setCardFee(String(feeSettings.card)); setQrFee(String(feeSettings.qr)) }, [feeSettings])
+
   const handleSaveFee = async () => {
-    await saveFeeSettings({ card: parseFloat(cardFee) || 0, qr: parseFloat(qrFee) || 0 })
+    const pct = Math.min(100, Math.max(0, parseFloat(backPct) || 0))
+    await Promise.all([
+      saveFeeSettings({ card: parseFloat(cardFee) || 0, qr: parseFloat(qrFee) || 0 }),
+      saveBackRate(pct / 100),
+    ])
+    setFeeSaved(true)
+    setTimeout(() => setFeeSaved(false), 2000)
   }
 
   const handleExportTx = () => {
@@ -70,7 +82,7 @@ export default function SalesScreen() {
           </button>
         ))}
         <button className={`top-action-btn ${showFeePanel ? 'active-s' : ''}`} onClick={() => setShowFeePanel((v) => !v)}>
-          <i className="ti ti-settings" aria-hidden /> 手数料
+          <i className="ti ti-settings" aria-hidden /> 手数料/バック
         </button>
         <button className={`top-action-btn ${showSyncPanel ? 'active-s' : ''}`} onClick={() => setShowSyncPanel((v) => !v)}>
           <i className="ti ti-cloud" aria-hidden /> 連携
@@ -90,10 +102,10 @@ export default function SalesScreen() {
         {showFeePanel && (
           <div className="fee-settings">
             <div className="fee-settings-title">
-              <i className="ti ti-settings" aria-hidden /> 決済手数料率の設定
+              <i className="ti ti-settings" aria-hidden /> 手数料・バック率の設定
             </div>
             <div className="fee-row">
-              <span className="fee-row-lbl"><i className="ti ti-credit-card" aria-hidden /> カード</span>
+              <span className="fee-row-lbl"><i className="ti ti-credit-card" aria-hidden /> カード手数料</span>
               <div className="fee-input-wrap">
                 <input className="fee-input" type="number" min="0" max="10" step="0.01"
                   value={cardFee} onChange={(e) => setCardFee(e.target.value)} />
@@ -101,16 +113,25 @@ export default function SalesScreen() {
               </div>
             </div>
             <div className="fee-row">
-              <span className="fee-row-lbl"><i className="ti ti-device-mobile" aria-hidden /> QR払い</span>
+              <span className="fee-row-lbl"><i className="ti ti-device-mobile" aria-hidden /> QR払い手数料</span>
               <div className="fee-input-wrap">
                 <input className="fee-input" type="number" min="0" max="10" step="0.01"
                   value={qrFee} onChange={(e) => setQrFee(e.target.value)} />
                 <span className="fee-pct">%</span>
               </div>
             </div>
-            <button className="modal-btn ok" style={{ marginTop: 6 }} onClick={handleSaveFee}>
-              保存
-            </button>
+            <div className="fee-row">
+              <span className="fee-row-lbl"><i className="ti ti-coin" aria-hidden /> キャストバック率</span>
+              <div className="fee-input-wrap">
+                <input className="fee-input" type="number" min="0" max="100" step="1"
+                  value={backPct} onChange={(e) => setBackPct(e.target.value)} />
+                <span className="fee-pct">%</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+              <button className="modal-btn ok" onClick={handleSaveFee}>保存</button>
+              {feeSaved && <span style={{ fontSize: 11, color: '#3b6d11' }}>保存しました ✓</span>}
+            </div>
           </div>
         )}
 

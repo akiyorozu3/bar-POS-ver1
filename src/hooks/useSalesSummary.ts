@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { Transaction, SalesSummary, PayMethod } from '@/types'
-import { BACK_RATE } from '@/store/posStore'
+import { usePosStore } from '@/store/posStore'
 
 const PAY_METHODS: PayMethod[] = ['cash', 'card', 'qr']
 
@@ -9,6 +9,7 @@ const PAY_METHODS: PayMethod[] = ['cash', 'card', 'qr']
  * Firestore からの transactions をそのまま渡せば OK。
  */
 export function useSalesSummary(transactions: Transaction[]): SalesSummary {
+  const backRate = usePosStore((s) => s.backRate)
   return useMemo(() => {
     const byMethod = Object.fromEntries(
       PAY_METHODS.map((m) => [m, { count: 0, sales: 0, fee: 0, net: 0 }])
@@ -55,7 +56,7 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
         txCount: v.txCount,
         salesAmount: v.salesAmount,
         // 担当未設定の売上はバック対象外（誰にも支払わない）
-        backAmount: name === UNASSIGNED ? 0 : Math.round(v.salesAmount * BACK_RATE),
+        backAmount: name === UNASSIGNED ? 0 : Math.round(v.salesAmount * backRate),
       }))
       .sort((a, b) => b.salesAmount - a.salesAmount)
 
@@ -70,5 +71,5 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
       castSummaries,
       transactions,
     }
-  }, [transactions])
+  }, [transactions, backRate])
 }
