@@ -238,7 +238,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .mm-add-row { display: flex; gap: 6px; align-items: center; }
 .mm-add-cat { font-size: 12px; border: 0.5px solid #ccc; border-radius: 6px; padding: 7px 6px; background: #fff; color: #1a1a18; font-family: inherit; }
 .mm-add-name { flex: 1; min-width: 0; padding: 7px 8px; border: 0.5px solid #ccc; border-radius: 6px; background: #fff; color: #1a1a18; font-size: 12px; font-family: inherit; outline: none; }
-.mm-add-price { width: 80px; padding: 7px 8px; border: 0.5px solid #ccc; border-radius: 6px; background: #fff; color: #1a1a18; font-size: 12px; font-family: inherit; outline: none; text-align: right; }
+.mm-add-price { width: 140px; padding: 7px 8px; border: 0.5px solid #378add; border-radius: 6px; background: #fff; color: #1a1a18; font-size: 12px; font-family: inherit; outline: none; text-align: right; }
+.mm-add-price::placeholder { color: #888780; }
 .mm-add-btn { padding: 7px 12px; border-radius: 6px; background: #378add; color: #fff; font-size: 11px; font-weight: 500; border: none; cursor: pointer; font-family: inherit; white-space: nowrap; }
 .mm-add-btn:disabled { background: #ccc; cursor: not-allowed; }
 .mm-add-hint { font-size: 10px; color: #185fa5; margin-top: 6px; }

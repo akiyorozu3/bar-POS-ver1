@@ -14,9 +14,11 @@ export default function MenuManageScreen() {
   const [category, setCategory] = useState<AddCategory>('ウイスキー')
   const [busy, setBusy] = useState(false)
 
+  const priceNum = parseInt(price, 10)
+  const canAdd = name.trim().length > 0 && Number.isFinite(priceNum) && priceNum > 0
+
   const handleAdd = async () => {
-    const priceNum = parseInt(price, 10)
-    if (!name.trim() || !Number.isFinite(priceNum) || priceNum <= 0) return
+    if (!canAdd) return
     setBusy(true)
     try {
       const isToday = category === '本日限定'
@@ -30,6 +32,8 @@ export default function MenuManageScreen() {
       })
       setName('')
       setPrice('')
+    } catch (e) {
+      alert('メニューの追加に失敗しました。\n' + ((e as Error)?.message ?? e))
     } finally {
       setBusy(false)
     }
@@ -39,6 +43,8 @@ export default function MenuManageScreen() {
     setBusy(true)
     try {
       await seedDefaultMenus()
+    } catch (e) {
+      alert('デフォルトメニューの投入に失敗しました。\n' + ((e as Error)?.message ?? e))
     } finally {
       setBusy(false)
     }
@@ -86,11 +92,11 @@ export default function MenuManageScreen() {
               className="mm-add-price"
               type="number"
               min="0"
-              placeholder="税抜"
+              placeholder="金額（税抜）"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
             />
-            <button className="mm-add-btn" onClick={handleAdd} disabled={busy}>＋ 追加</button>
+            <button className="mm-add-btn" onClick={handleAdd} disabled={!canAdd || busy}>＋ 追加</button>
           </div>
           {price !== '' && parseInt(price, 10) > 0 && (
             <div className="mm-add-hint">税込 ¥{toTaxInc(parseInt(price, 10)).toLocaleString()}</div>
