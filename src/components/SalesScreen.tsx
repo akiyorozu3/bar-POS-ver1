@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { usePosStore } from '@/store/posStore'
+import { usePosStore, todayStr } from '@/store/posStore'
 import { useSalesSummary } from '@/hooks/useSalesSummary'
 import { buildTransactionCSV, buildCastCSV, downloadCSV } from '@/lib/csv'
 import type { PayMethod } from '@/types'
@@ -28,10 +28,12 @@ function periodRange(period: Period): [Date, Date] {
 }
 
 export default function SalesScreen() {
-  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, saveBackRate, taxRate, taxMode, saveTaxSettings } = usePosStore()
+  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, saveBackRate, taxRate, taxMode, saveTaxSettings, seats, orders, closedDates, closeDay, reopenDay } = usePosStore()
   const [period, setPeriod] = useState<Period>('today')
   const [showFeePanel, setShowFeePanel] = useState(false)
   const [showSyncPanel, setShowSyncPanel] = useState(false)
+  const [showClosePanel, setShowClosePanel] = useState(false)
+  const [closing, setClosing] = useState(false)
   const [cardFee, setCardFee] = useState(String(feeSettings.card))
   const [qrFee, setQrFee] = useState(String(feeSettings.qr))
   const [backPct, setBackPct] = useState(String(Math.round(backRate * 100)))
@@ -48,6 +50,39 @@ export default function SalesScreen() {
   }, [period, subscribeTransactions])
 
   const summary = useSalesSummary(transactions)
+
+  // レジ締め
+  const today = todayStr()
+  const todayClosed = closedDates.includes(today)
+  const unpaidCount = seats.filter((s) => (orders[s.id]?.length ?? 0) > 0).length
+  const totalBack = summary.castSummaries.reduce((a, c) => a + c.backAmount, 0)
+
+  const handleClose = async () => {
+    if (!confirm('本日を締めますか？\n締め後は本日の会計入力ができなくなります（締め解除で戻せます）。')) return
+    setClosing(true)
+    try {
+      await closeDay({
+        totalSales: summary.totalSales,
+        cash: summary.byMethod.cash.sales,
+        card: summary.byMethod.card.sales,
+        qr: summary.byMethod.qr.sales,
+        totalFee: summary.totalFee,
+        totalNet: summary.totalNet,
+        totalBack,
+        txCount: summary.txCount,
+      })
+    } catch (e) {
+      alert('レジ締めに失敗しました。\n' + ((e as Error)?.message ?? e))
+    } finally { setClosing(false) }
+  }
+
+  const handleReopen = async () => {
+    if (!confirm('本日の締めを解除しますか？')) return
+    setClosing(true)
+    try { await reopenDay(today) }
+    catch (e) { alert('解除に失敗しました。\n' + ((e as Error)?.message ?? e)) }
+    finally { setClosing(false) }
+  }
 
   // 設定が非同期で読み込まれたら入力欄に反映
   useEffect(() => { setBackPct(String(Math.round(backRate * 100))) }, [backRate])
@@ -96,6 +131,12 @@ export default function SalesScreen() {
         <button className={`top-action-btn ${showSyncPanel ? 'active-s' : ''}`} onClick={() => setShowSyncPanel((v) => !v)}>
           <i className="ti ti-cloud" aria-hidden /> 連携
         </button>
+        <button
+          className={`top-action-btn ${showClosePanel ? 'active-s' : ''} ${todayClosed ? 'closed' : ''}`}
+          onClick={() => { setPeriod('today'); setShowClosePanel((v) => !v) }}
+        >
+          <i className="ti ti-lock" aria-hidden /> レジ締め{todayClosed ? '済' : ''}
+        </button>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
           <button className="export-btn" onClick={handleExportTx}>
             <i className="ti ti-download" aria-hidden /> 売上CSV
@@ -107,6 +148,39 @@ export default function SalesScreen() {
       </div>
 
       <div className="sales-body">
+        {/* レジ締めパネル */}
+        {showClosePanel && (
+          <div className="fee-settings">
+            <div className="fee-settings-title">
+              <i className="ti ti-lock" aria-hidden /> レジ締め（{today.replace(/-/g, '/')}）
+            </div>
+            {todayClosed ? (
+              <>
+                <div className="close-done">本日は締め済みです。本日の会計入力はできません。</div>
+                <button className="modal-btn" style={{ marginTop: 8 }} onClick={handleReopen} disabled={closing}>
+                  締め解除（再び入力可能にする）
+                </button>
+              </>
+            ) : (
+              <>
+                {unpaidCount > 0 && (
+                  <div className="close-warn">⚠ 未会計の卓が {unpaidCount} 卓あります。締めるとこの売上は本日に入りません。</div>
+                )}
+                <div className="close-row"><span>現金</span><span>¥{summary.byMethod.cash.sales.toLocaleString()}</span></div>
+                <div className="close-row"><span>カード</span><span>¥{summary.byMethod.card.sales.toLocaleString()}</span></div>
+                <div className="close-row"><span>QR払い</span><span>¥{summary.byMethod.qr.sales.toLocaleString()}</span></div>
+                <div className="close-row total"><span>売上合計（{summary.txCount}件）</span><span>¥{summary.totalSales.toLocaleString()}</span></div>
+                <div className="close-row"><span>決済手数料</span><span className="fee-amt">−¥{summary.totalFee.toLocaleString()}</span></div>
+                <div className="close-row"><span>実際の入金合計</span><span className="net-amt">¥{summary.totalNet.toLocaleString()}</span></div>
+                <div className="close-row"><span>バック合計</span><span className="back-badge">¥{totalBack.toLocaleString()}</span></div>
+                <button className="modal-btn ok" style={{ marginTop: 8, width: '100%' }} onClick={handleClose} disabled={closing}>
+                  本日を締める
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
         {/* 手数料設定パネル */}
         {showFeePanel && (
           <div className="fee-settings">

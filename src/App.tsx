@@ -22,7 +22,7 @@ export default function App() {
   const {
     user, role, authReady,
     initAuth, signOutUser,
-    subscribeMenus, subscribeCasts, subscribeTables, loadFeeSettings, loadBackRate, loadCategoryRates, loadTaxSettings,
+    subscribeMenus, subscribeCasts, subscribeTables, subscribeClosures, loadFeeSettings, loadBackRate, loadCategoryRates, loadTaxSettings,
     entryDate, setEntryDate,
   } = usePosStore()
 
@@ -41,12 +41,13 @@ export default function App() {
     const unsubMenus = subscribeMenus()
     const unsubCasts = subscribeCasts()
     const unsubTables = subscribeTables()
+    const unsubClosures = subscribeClosures()
     loadFeeSettings()
     loadBackRate()
     loadCategoryRates()
     loadTaxSettings()
-    return () => { unsubMenus(); unsubCasts(); unsubTables() }
-  }, [user, subscribeMenus, subscribeCasts, subscribeTables, loadFeeSettings, loadBackRate, loadCategoryRates, loadTaxSettings])
+    return () => { unsubMenus(); unsubCasts(); unsubTables(); unsubClosures() }
+  }, [user, subscribeMenus, subscribeCasts, subscribeTables, subscribeClosures, loadFeeSettings, loadBackRate, loadCategoryRates, loadTaxSettings])
 
   // 権限が変わったら、許可されない画面からは注文入力に戻す
   useEffect(() => {

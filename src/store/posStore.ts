@@ -32,7 +32,7 @@ import { db, auth, COLLECTIONS } from '@/lib/firebase'
 import { idToEmail, emailToRole } from '@/lib/authConfig'
 import { calcBill, calcFee, DEFAULT_TAX_RATE } from '@/lib/tax'
 import { DEFAULT_MENUS } from '@/lib/defaultMenus'
-import type { Seat, OrderItem, MenuItem, Cast, Transaction, FeeSettings, PayMethod, Role, TaxMode, TaxSettings } from '@/types'
+import type { Seat, OrderItem, MenuItem, Cast, Transaction, FeeSettings, PayMethod, Role, TaxMode, TaxSettings, Closure } from '@/types'
 
 // 初期投入用のデフォルトキャスト（実データは Firestore で管理）
 export const DEFAULT_CASTS = ['さくら', 'あおい', 'ひなた', 'れいな']
@@ -84,6 +84,9 @@ interface PosState {
   // 入力日（会計を記録する日付。YYYY-MM-DD。遡及入力用に変更可）
   entryDate: string
 
+  // レジ締め済みの日付（YYYY-MM-DD）の一覧
+  closedDates: string[]
+
   // 認証アクション
   initAuth: () => () => void
   signIn: (id: string, password: string) => Promise<void>
@@ -122,6 +125,9 @@ interface PosState {
 
   subscribeMenus: () => () => void
   subscribeTables: () => () => void
+  subscribeClosures: () => () => void
+  closeDay: (snapshot: Omit<Closure, 'date' | 'closedAt'>) => Promise<void>
+  reopenDay: (date: string) => Promise<void>
   subscribeTransactions: (from: Date, to: Date) => () => void
 
   saveFeeSettings: (settings: FeeSettings) => Promise<void>
@@ -211,6 +217,7 @@ export const usePosStore = create<PosState>((set, get) => {
   taxRate: DEFAULT_TAX_RATE,
   taxMode: 'exclusive',
   entryDate: todayStr(),
+  closedDates: [],
 
   // ── 認証 ─────────────────────────────────────
   initAuth: () => {
@@ -382,7 +389,11 @@ export const usePosStore = create<PosState>((set, get) => {
 
   // ── 会計確定 → Firestore書き込み ─────────────
   completePayment: async (seatId, payMethod, _cashReceived) => {
-    const { seats, orders, feeSettings, taxRate, taxMode, entryDate } = get()
+    const { seats, orders, feeSettings, taxRate, taxMode, entryDate, closedDates } = get()
+    // 締め済みの日付には記録できない
+    if (closedDates.includes(entryDate)) {
+      throw new Error(`${entryDate} は締め済みです。締め解除すると入力できます。`)
+    }
     const seat = seats.find((s) => s.id === seatId)
     if (!seat) return
 
@@ -477,6 +488,27 @@ export const usePosStore = create<PosState>((set, get) => {
       // 権限未設定（ルール未公開）等。ローカルの初期席のまま継続する
     })
     return unsub
+  },
+
+  // ── レジ締め ──────────────────────────────────
+  subscribeClosures: () => {
+    const unsub = onSnapshot(collection(db, COLLECTIONS.CLOSURES), (snap) => {
+      set({ closedDates: snap.docs.map((d) => d.id) })
+    }, () => { /* ルール未公開等は無視 */ })
+    return unsub
+  },
+
+  closeDay: async (snapshot) => {
+    const date = todayStr()
+    await setDoc(doc(db, COLLECTIONS.CLOSURES, date), {
+      ...snapshot,
+      date,
+      closedAt: Date.now(),
+    })
+  },
+
+  reopenDay: async (date) => {
+    await deleteDoc(doc(db, COLLECTIONS.CLOSURES, date))
   },
 
   subscribeMenus: () => {

@@ -22,4 +22,5 @@ export const COLLECTIONS = {
   CASTS: 'casts',
   SETTINGS: 'settings',
   TABLES: 'tables',
+  CLOSURES: 'closures',
 } as const

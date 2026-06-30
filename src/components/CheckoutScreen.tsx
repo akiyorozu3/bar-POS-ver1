@@ -16,8 +16,9 @@ interface Props {
 }
 
 export default function CheckoutScreen({ onBack }: Props) {
-  const { seats, currentSeatId, orders, feeSettings, completePayment, setCurrentSeat, role, taxRate, taxMode } = usePosStore()
+  const { seats, currentSeatId, orders, feeSettings, completePayment, setCurrentSeat, role, taxRate, taxMode, entryDate, closedDates } = usePosStore()
   const isOwner = role === 'owner'
+  const dayClosed = closedDates.includes(entryDate)
   const taxIncluded = taxMode === 'inclusive'
   const taxPct = Math.round(taxRate * 100)
   const seat = seats.find((s) => s.id === currentSeatId)
@@ -53,11 +54,13 @@ export default function CheckoutScreen({ onBack }: Props) {
     payMethod !== 'cash' || (cashReceived != null && cashReceived >= totalAmt)
 
   const handleConfirm = async () => {
-    if (!currentSeatId || !canConfirm) return
+    if (!currentSeatId || !canConfirm || dayClosed) return
     setLoading(true)
     try {
       await completePayment(currentSeatId, payMethod, cashReceived ?? undefined)
       onBack()
+    } catch (e) {
+      alert((e as Error)?.message ?? '会計に失敗しました')
     } finally {
       setLoading(false)
     }
@@ -192,12 +195,15 @@ export default function CheckoutScreen({ onBack }: Props) {
             </div>
           )}
 
+          {dayClosed && (
+            <div className="close-warn">{entryDate} は締め済みです。締め解除すると入力できます。</div>
+          )}
           <button
             className="confirm-btn"
-            disabled={!canConfirm || loading}
+            disabled={!canConfirm || loading || dayClosed}
             onClick={handleConfirm}
           >
-            {loading ? '処理中...' : '支払い確定'}
+            {loading ? '処理中...' : dayClosed ? '締め済み' : '支払い確定'}
           </button>
         </div>
       </div>

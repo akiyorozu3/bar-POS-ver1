@@ -74,6 +74,20 @@ export interface FeeSettings {
   qr: number     // %
 }
 
+// ── レジ締め（日次） ─────────────────────────────
+export interface Closure {
+  date: string       // YYYY-MM-DD（ドキュメントID）
+  closedAt: number   // 締めた時刻
+  totalSales: number // 税込売上合計
+  cash: number       // 現金売上
+  card: number       // カード売上
+  qr: number         // QR売上
+  totalFee: number   // 決済手数料合計
+  totalNet: number   // 実入金合計
+  totalBack: number  // バック合計
+  txCount: number    // 取引件数
+}
+
 // ── キャスト集計 ─────────────────────────────────
 export interface CastSummary {
   name: string

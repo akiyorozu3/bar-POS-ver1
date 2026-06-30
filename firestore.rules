@@ -30,6 +30,12 @@ service cloud.firestore {
       allow read, write: if isAuthed();
     }
 
+    // レジ締め：ログイン済みは閲覧可（締め済み判定に必要） / 締め・解除はオーナーのみ
+    match /closures/{id} {
+      allow read: if isAuthed();
+      allow write: if isOwner();
+    }
+
     // 手数料設定：ログイン済みは閲覧可（会計計算に必要） / 変更はオーナーのみ
     match /settings/{id} {
       allow read: if isAuthed();

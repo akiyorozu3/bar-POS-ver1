@@ -146,6 +146,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .period-btn.active { background: #fff; color: #1a1a18; border-color: #ccc; font-weight: 500; }
 .top-action-btn { padding: 3px 10px; border-radius: 16px; font-size: 11px; border: 0.5px solid #e0ddd5; cursor: pointer; color: #5f5e5a; background: transparent; font-family: inherit; display: flex; align-items: center; gap: 4px; }
 .top-action-btn.active-s { background: #e6f1fb; border-color: #378add; color: #185fa5; }
+.top-action-btn.closed { border-color: #ba7517; color: #854f0b; background: #faeeda; }
+.close-row { display: flex; justify-content: space-between; padding: 5px 2px; font-size: 12px; color: #1a1a18; border-bottom: 0.5px solid #ece9e3; }
+.close-row.total { font-weight: 600; font-size: 13px; border-bottom: 0.5px solid #ccc; }
+.close-warn { font-size: 11px; color: #854f0b; background: #faeeda; border: 0.5px solid #e3c79a; border-radius: 6px; padding: 7px 9px; margin-bottom: 8px; }
+.close-done { font-size: 12px; color: #1a1a18; background: #f8f7f4; border: 0.5px solid #e0ddd5; border-radius: 6px; padding: 9px 10px; }
 .export-btn { padding: 3px 10px; border-radius: 16px; font-size: 11px; border: 0.5px solid #ccc; cursor: pointer; color: #1a1a18; background: #fff; font-family: inherit; display: flex; align-items: center; gap: 4px; }
 .sales-body { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
 .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
