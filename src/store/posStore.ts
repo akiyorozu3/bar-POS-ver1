@@ -71,6 +71,9 @@ interface PosState {
   // バック率（0.30 = 30%）
   backRate: number
 
+  // カテゴリ別バック率（例 { 'キャストドリンク': 0.5 }。未設定は backRate を使う）
+  categoryRates: Record<string, number>
+
   // 認証アクション
   initAuth: () => () => void
   signIn: (id: string, password: string) => Promise<void>
@@ -98,6 +101,7 @@ interface PosState {
   addOrderItem: (seatId: string, item: Omit<OrderItem, 'id'>) => void
   changeQty: (seatId: string, itemId: string, delta: number) => void
   changeItemCast: (seatId: string, itemId: string, cast: string) => void
+  toggleItemFullBack: (seatId: string, itemId: string) => void
   clearOrder: (seatId: string) => void
 
   completePayment: (
@@ -114,6 +118,9 @@ interface PosState {
 
   saveBackRate: (rate: number) => Promise<void>
   loadBackRate: () => Promise<void>
+
+  saveCategoryRates: (rates: Record<string, number>) => Promise<void>
+  loadCategoryRates: () => Promise<void>
 }
 
 let seatCounter = 0
@@ -142,6 +149,7 @@ export const usePosStore = create<PosState>((set, get) => ({
   transactionsLoading: true,
   feeSettings: { card: 3.25, qr: 1.98 },
   backRate: BACK_RATE,
+  categoryRates: {},
 
   // ── 認証 ─────────────────────────────────────
   initAuth: () => {
@@ -297,6 +305,16 @@ export const usePosStore = create<PosState>((set, get) => ({
       },
     })),
 
+  toggleItemFullBack: (seatId, itemId) =>
+    set((s) => ({
+      orders: {
+        ...s.orders,
+        [seatId]: (s.orders[seatId] ?? []).map((x) =>
+          x.id === itemId ? { ...x, fullBack: !x.fullBack } : x
+        ),
+      },
+    })),
+
   clearOrder: (seatId) =>
     set((s) => ({ orders: { ...s.orders, [seatId]: [] } })),
 
@@ -403,6 +421,19 @@ export const usePosStore = create<PosState>((set, get) => ({
     const snap = await getDoc(doc(db, COLLECTIONS.SETTINGS, 'back'))
     if (snap.exists()) {
       set({ backRate: (snap.data() as { rate: number }).rate })
+    }
+  },
+
+  // ── カテゴリ別バック率の永続化 ─────────────────
+  saveCategoryRates: async (rates) => {
+    set({ categoryRates: rates })
+    await setDoc(doc(db, COLLECTIONS.SETTINGS, 'categoryRates'), rates)
+  },
+
+  loadCategoryRates: async () => {
+    const snap = await getDoc(doc(db, COLLECTIONS.SETTINGS, 'categoryRates'))
+    if (snap.exists()) {
+      set({ categoryRates: snap.data() as Record<string, number> })
     }
   },
 }))

@@ -10,7 +10,7 @@ export default function OrderScreen() {
   const {
     seats, currentSeatId, orders,
     addSeat, updateSeat, setCurrentSeat,
-    menus, casts, addOrderItem, changeQty, changeItemCast, clearOrder, setSeatCast,
+    menus, casts, addOrderItem, changeQty, changeItemCast, toggleItemFullBack, clearOrder, setSeatCast,
   } = usePosStore()
 
   const [tab, setTab] = useState<Tab>('セット')
@@ -38,8 +38,10 @@ export default function OrderScreen() {
       priceExTax: m.priceExTax,
       qty: 1,
       cast: seat?.defaultCast ?? '',
+      category: m.category,
       isToday: m.isToday,
       isFree: false,
+      fullBack: false,
     })
   }
 
@@ -50,8 +52,10 @@ export default function OrderScreen() {
       priceExTax: parseInt(freePrice),
       qty: 1,
       cast: seat?.defaultCast ?? '',
+      category: 'フリー入力',
       isToday: false,
       isFree: true,
+      fullBack: false,
     })
     setFreeName('')
     setFreePrice('')
@@ -128,7 +132,8 @@ export default function OrderScreen() {
                       if (!currentSeatId) return
                       addOrderItem(currentSeatId, {
                         name: p.name, priceExTax: p.priceExTax, qty: 1,
-                        cast: seat?.defaultCast ?? '', isToday: false, isFree: true,
+                        cast: seat?.defaultCast ?? '', category: 'フリー入力',
+                        isToday: false, isFree: true, fullBack: false,
                       })
                     }}
                   >
@@ -229,6 +234,13 @@ export default function OrderScreen() {
                       <option value="">未設定</option>
                       {casts.map((c) => <option key={c.id}>{c.name}</option>)}
                     </select>
+                    <button
+                      className={`fullback-toggle ${item.fullBack ? 'on' : ''}`}
+                      onClick={() => currentSeatId && toggleItemFullBack(currentSeatId, item.id)}
+                      title="この商品だけ全額バックにする"
+                    >
+                      {item.fullBack ? '全額✓' : '全額'}
+                    </button>
                   </div>
                 </div>
               ))

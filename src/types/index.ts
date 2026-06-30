@@ -14,8 +14,10 @@ export interface OrderItem {
   priceExTax: number   // 税抜価格
   qty: number
   cast: string         // 担当キャスト（空文字=未設定）
+  category: string     // バック率の判定に使うカテゴリ（フリー入力は'フリー入力'）
   isToday: boolean     // 本日限定メニューフラグ
   isFree: boolean      // フリー入力フラグ
+  fullBack: boolean    // 全額バック（この商品だけ100%バック）
 }
 
 // ── キャスト ─────────────────────────────────────

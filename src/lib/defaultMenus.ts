@@ -30,7 +30,7 @@ export const DEFAULT_MENUS: Omit<MenuItem, 'id'>[] = [
   { name: '生ハム',           priceExTax:  909, category: 'フード', isToday: false, sortOrder: 43 },
 ]
 
-export const MENU_CATEGORIES = ['セット', 'ショット', 'シャンパン', 'ウイスキー', 'カクテル', 'ビール', 'フード'] as const
+export const MENU_CATEGORIES = ['セット', 'ショット', 'シャンパン', 'キャストドリンク', 'ウイスキー', 'カクテル', 'ビール', 'フード'] as const
 export type MenuCategory = typeof MENU_CATEGORIES[number]
 
 /** よく使うフリー入力プリセット */

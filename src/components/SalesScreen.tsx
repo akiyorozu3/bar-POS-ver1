@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { usePosStore } from '@/store/posStore'
 import { useSalesSummary } from '@/hooks/useSalesSummary'
 import { buildTransactionCSV, buildCastCSV, downloadCSV } from '@/lib/csv'
+import { MENU_CATEGORIES } from '@/lib/defaultMenus'
 import type { PayMethod } from '@/types'
 
 type Period = 'today' | 'week' | 'month'
@@ -28,13 +29,17 @@ function periodRange(period: Period): [Date, Date] {
 }
 
 export default function SalesScreen() {
-  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, saveBackRate } = usePosStore()
+  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, saveBackRate, categoryRates, saveCategoryRates } = usePosStore()
   const [period, setPeriod] = useState<Period>('today')
   const [showFeePanel, setShowFeePanel] = useState(false)
   const [showSyncPanel, setShowSyncPanel] = useState(false)
   const [cardFee, setCardFee] = useState(String(feeSettings.card))
   const [qrFee, setQrFee] = useState(String(feeSettings.qr))
   const [backPct, setBackPct] = useState(String(Math.round(backRate * 100)))
+  // カテゴリ別バック率（%文字列。空欄＝基本バック率を使う）
+  const catToStr = (rates: Record<string, number>) =>
+    Object.fromEntries(MENU_CATEGORIES.map((c) => [c, c in rates ? String(Math.round(rates[c] * 100)) : '']))
+  const [catPct, setCatPct] = useState<Record<string, string>>(catToStr(categoryRates))
   const [feeSaved, setFeeSaved] = useState(false)
 
   // 期間が変わるたびに購読し直す
@@ -49,12 +54,22 @@ export default function SalesScreen() {
   // 設定が非同期で読み込まれたら入力欄に反映
   useEffect(() => { setBackPct(String(Math.round(backRate * 100))) }, [backRate])
   useEffect(() => { setCardFee(String(feeSettings.card)); setQrFee(String(feeSettings.qr)) }, [feeSettings])
+  useEffect(() => { setCatPct(catToStr(categoryRates)) }, [categoryRates])
 
   const handleSaveFee = async () => {
     const pct = Math.min(100, Math.max(0, parseFloat(backPct) || 0))
+    // 空欄は除外し、入力されたカテゴリだけ率を保存
+    const rates: Record<string, number> = {}
+    for (const c of MENU_CATEGORIES) {
+      const v = catPct[c]
+      if (v != null && v.trim() !== '') {
+        rates[c] = Math.min(100, Math.max(0, parseFloat(v) || 0)) / 100
+      }
+    }
     await Promise.all([
       saveFeeSettings({ card: parseFloat(cardFee) || 0, qr: parseFloat(qrFee) || 0 }),
       saveBackRate(pct / 100),
+      saveCategoryRates(rates),
     ])
     setFeeSaved(true)
     setTimeout(() => setFeeSaved(false), 2000)
@@ -121,13 +136,28 @@ export default function SalesScreen() {
               </div>
             </div>
             <div className="fee-row">
-              <span className="fee-row-lbl"><i className="ti ti-coin" aria-hidden /> キャストバック率</span>
+              <span className="fee-row-lbl"><i className="ti ti-coin" aria-hidden /> キャストバック率（基本）</span>
               <div className="fee-input-wrap">
                 <input className="fee-input" type="number" min="0" max="100" step="1"
                   value={backPct} onChange={(e) => setBackPct(e.target.value)} />
                 <span className="fee-pct">%</span>
               </div>
             </div>
+
+            <div className="cat-rate-title">カテゴリ別バック率（空欄＝基本率）</div>
+            {MENU_CATEGORIES.map((c) => (
+              <div className="fee-row" key={c}>
+                <span className="fee-row-lbl">{c}</span>
+                <div className="fee-input-wrap">
+                  <input className="fee-input" type="number" min="0" max="100" step="1"
+                    placeholder="基本"
+                    value={catPct[c] ?? ''}
+                    onChange={(e) => setCatPct((p) => ({ ...p, [c]: e.target.value }))} />
+                  <span className="fee-pct">%</span>
+                </div>
+              </div>
+            ))}
+
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
               <button className="modal-btn ok" onClick={handleSaveFee}>保存</button>
               {feeSaved && <span style={{ fontSize: 11, color: '#3b6d11' }}>保存しました ✓</span>}
