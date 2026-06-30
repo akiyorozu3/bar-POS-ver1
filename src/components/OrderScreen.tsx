@@ -10,7 +10,7 @@ export default function OrderScreen() {
   const {
     seats, currentSeatId, orders,
     addSeat, updateSeat, setCurrentSeat,
-    menus, casts, addOrderItem, changeQty, changeItemCast, clearOrder,
+    menus, casts, addOrderItem, changeQty, changeItemCast, clearOrder, setSeatCast,
   } = usePosStore()
 
   const [tab, setTab] = useState<Tab>('セット')
@@ -192,7 +192,7 @@ export default function OrderScreen() {
               <select
                 className="cast-sel"
                 value={seat?.defaultCast ?? ''}
-                onChange={(e) => seat && updateSeat(seat.id, { defaultCast: e.target.value })}
+                onChange={(e) => seat && setSeatCast(seat.id, e.target.value)}
               >
                 <option value="">担当未設定</option>
                 {casts.map((c) => <option key={c.id}>{c.name}</option>)}

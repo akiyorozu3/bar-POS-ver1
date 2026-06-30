@@ -92,6 +92,7 @@ interface PosState {
   // アクション
   addSeat: (name: string, solo: boolean) => void
   updateSeat: (id: string, patch: Partial<Seat>) => void
+  setSeatCast: (seatId: string, cast: string) => void
   setCurrentSeat: (id: string) => void
 
   addOrderItem: (seatId: string, item: Omit<OrderItem, 'id'>) => void
@@ -237,6 +238,16 @@ export const usePosStore = create<PosState>((set, get) => ({
   updateSeat: (id, patch) =>
     set((s) => ({
       seats: s.seats.map((seat) => (seat.id === id ? { ...seat, ...patch } : seat)),
+    })),
+
+  // 席の担当キャストを変更し、その席の注文中の全商品にも担当を反映する
+  setSeatCast: (seatId, cast) =>
+    set((s) => ({
+      seats: s.seats.map((seat) => (seat.id === seatId ? { ...seat, defaultCast: cast } : seat)),
+      orders: {
+        ...s.orders,
+        [seatId]: (s.orders[seatId] ?? []).map((x) => ({ ...x, cast })),
+      },
     })),
 
   setCurrentSeat: (id) => set({ currentSeatId: id }),
