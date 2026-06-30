@@ -499,7 +499,8 @@ export const usePosStore = create<PosState>((set, get) => {
   },
 
   closeDay: async (snapshot) => {
-    const date = todayStr()
+    // 締める日付はヘッダーの入力日（遡及入力で過去日も締められる）
+    const date = get().entryDate
     await setDoc(doc(db, COLLECTIONS.CLOSURES, date), {
       ...snapshot,
       date,

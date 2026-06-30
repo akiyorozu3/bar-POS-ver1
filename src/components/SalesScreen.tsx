@@ -12,23 +12,29 @@ const PAY_METHOD_CLS: Record<PayMethod, string> = {
   cash: 'method-cash', card: 'method-card', qr: 'method-qr',
 }
 
-function periodRange(period: Period): [Date, Date] {
-  const now = new Date()
-  const to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+function periodRange(period: Period, entryDate: string): [Date, Date] {
+  // 今日・今週はヘッダーの入力日を基準にする（今月は実際の今日基準のまま）
+  const ref = new Date(`${entryDate}T00:00:00`)
+  const base = isNaN(ref.getTime()) ? new Date() : ref
   if (period === 'today') {
-    const from = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const from = new Date(base.getFullYear(), base.getMonth(), base.getDate())
+    const to = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 23, 59, 59, 999)
     return [from, to]
   }
   if (period === 'week') {
-    const from = new Date(now); from.setDate(now.getDate() - 6); from.setHours(0,0,0,0)
+    const to = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 23, 59, 59, 999)
+    const from = new Date(base); from.setDate(base.getDate() - 6); from.setHours(0, 0, 0, 0)
     return [from, to]
   }
+  // 今月：実際の今日基準（そのまま）
+  const now = new Date()
   const from = new Date(now.getFullYear(), now.getMonth(), 1)
+  const to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
   return [from, to]
 }
 
 export default function SalesScreen() {
-  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, saveBackRate, taxRate, taxMode, saveTaxSettings, seats, orders, closedDates, closeDay, reopenDay } = usePosStore()
+  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, saveBackRate, taxRate, taxMode, saveTaxSettings, seats, orders, closedDates, closeDay, reopenDay, entryDate } = usePosStore()
   const [period, setPeriod] = useState<Period>('today')
   const [showFeePanel, setShowFeePanel] = useState(false)
   const [showSyncPanel, setShowSyncPanel] = useState(false)
@@ -42,23 +48,24 @@ export default function SalesScreen() {
   const [taxModeLocal, setTaxModeLocal] = useState(taxMode)
   const [feeSaved, setFeeSaved] = useState(false)
 
-  // 期間が変わるたびに購読し直す
+  // 期間・入力日が変わるたびに購読し直す
   useEffect(() => {
-    const [from, to] = periodRange(period)
+    const [from, to] = periodRange(period, entryDate)
     const unsub = subscribeTransactions(from, to)
     return unsub
-  }, [period, subscribeTransactions])
+  }, [period, entryDate, subscribeTransactions])
 
   const summary = useSalesSummary(transactions)
 
-  // レジ締め
-  const today = todayStr()
-  const todayClosed = closedDates.includes(today)
+  // レジ締め（ヘッダーの入力日を対象にする）
+  const closeDate = entryDate
+  const dateClosed = closedDates.includes(closeDate)
+  const isBackdated = closeDate !== todayStr()
   const unpaidCount = seats.filter((s) => (orders[s.id]?.length ?? 0) > 0).length
   const totalBack = summary.castSummaries.reduce((a, c) => a + c.backAmount, 0)
 
   const handleClose = async () => {
-    if (!confirm('本日を締めますか？\n締め後は本日の会計入力ができなくなります（締め解除で戻せます）。')) return
+    if (!confirm(`${closeDate} を締めますか？\n締め後はこの日の会計入力ができなくなります（締め解除で戻せます）。`)) return
     setClosing(true)
     try {
       await closeDay({
@@ -77,9 +84,9 @@ export default function SalesScreen() {
   }
 
   const handleReopen = async () => {
-    if (!confirm('本日の締めを解除しますか？')) return
+    if (!confirm(`${closeDate} の締めを解除しますか？`)) return
     setClosing(true)
-    try { await reopenDay(today) }
+    try { await reopenDay(closeDate) }
     catch (e) { alert('解除に失敗しました。\n' + ((e as Error)?.message ?? e)) }
     finally { setClosing(false) }
   }
@@ -132,10 +139,10 @@ export default function SalesScreen() {
           <i className="ti ti-cloud" aria-hidden /> 連携
         </button>
         <button
-          className={`top-action-btn ${showClosePanel ? 'active-s' : ''} ${todayClosed ? 'closed' : ''}`}
+          className={`top-action-btn ${showClosePanel ? 'active-s' : ''} ${dateClosed ? 'closed' : ''}`}
           onClick={() => { setPeriod('today'); setShowClosePanel((v) => !v) }}
         >
-          <i className="ti ti-lock" aria-hidden /> レジ締め{todayClosed ? '済' : ''}
+          <i className="ti ti-lock" aria-hidden /> レジ締め{dateClosed ? '済' : ''}
         </button>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
           <button className="export-btn" onClick={handleExportTx}>
@@ -152,11 +159,11 @@ export default function SalesScreen() {
         {showClosePanel && (
           <div className="fee-settings">
             <div className="fee-settings-title">
-              <i className="ti ti-lock" aria-hidden /> レジ締め（{today.replace(/-/g, '/')}）
+              <i className="ti ti-lock" aria-hidden /> レジ締め（{closeDate.replace(/-/g, '/')}{isBackdated ? '・遡及' : ''}）
             </div>
-            {todayClosed ? (
+            {dateClosed ? (
               <>
-                <div className="close-done">本日は締め済みです。本日の会計入力はできません。</div>
+                <div className="close-done">{closeDate} は締め済みです。この日の会計入力はできません。</div>
                 <button className="modal-btn" style={{ marginTop: 8 }} onClick={handleReopen} disabled={closing}>
                   締め解除（再び入力可能にする）
                 </button>
@@ -164,7 +171,7 @@ export default function SalesScreen() {
             ) : (
               <>
                 {unpaidCount > 0 && (
-                  <div className="close-warn">⚠ 未会計の卓が {unpaidCount} 卓あります。締めるとこの売上は本日に入りません。</div>
+                  <div className="close-warn">⚠ 未会計の卓が {unpaidCount} 卓あります。締めるとこの売上は集計に入りません。</div>
                 )}
                 <div className="close-row"><span>現金</span><span>¥{summary.byMethod.cash.sales.toLocaleString()}</span></div>
                 <div className="close-row"><span>カード</span><span>¥{summary.byMethod.card.sales.toLocaleString()}</span></div>
@@ -174,7 +181,7 @@ export default function SalesScreen() {
                 <div className="close-row"><span>実際の入金合計</span><span className="net-amt">¥{summary.totalNet.toLocaleString()}</span></div>
                 <div className="close-row"><span>バック合計</span><span className="back-badge">¥{totalBack.toLocaleString()}</span></div>
                 <button className="modal-btn ok" style={{ marginTop: 8, width: '100%' }} onClick={handleClose} disabled={closing}>
-                  本日を締める
+                  {closeDate.replace(/-/g, '/')} を締める
                 </button>
               </>
             )}
