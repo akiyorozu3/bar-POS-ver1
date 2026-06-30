@@ -22,7 +22,7 @@ export default function App() {
   const {
     user, role, authReady,
     initAuth, signOutUser,
-    subscribeMenus, subscribeCasts, subscribeTables, loadFeeSettings, loadBackRate, loadCategoryRates, loadTaxSettings, currentSeatId, orders,
+    subscribeMenus, subscribeCasts, subscribeTables, loadFeeSettings, loadBackRate, loadCategoryRates, loadTaxSettings,
   } = usePosStore()
 
   const isOwner = role === 'owner'
@@ -53,13 +53,10 @@ export default function App() {
 
   // 会計へ遷移イベント（OrderScreen から発火）
   useEffect(() => {
-    const handler = () => {
-      const items = currentSeatId ? (orders[currentSeatId] ?? []) : []
-      if (items.length > 0) setScreen('checkout')
-    }
+    const handler = () => setScreen('checkout')
     document.addEventListener('pos:go-checkout', handler)
     return () => document.removeEventListener('pos:go-checkout', handler)
-  }, [currentSeatId, orders])
+  }, [])
 
   // 認証確認中
   if (!authReady) return <div className="app"><div className="loading">読み込み中...</div></div>
@@ -89,10 +86,7 @@ export default function App() {
         </button>
         <button
           className={`nav-btn ${screen === 'checkout' ? 'active' : ''}`}
-          onClick={() => {
-            const items = currentSeatId ? (orders[currentSeatId] ?? []) : []
-            if (items.length > 0) setScreen('checkout')
-          }}
+          onClick={() => setScreen('checkout')}
         >
           <i className="ti ti-receipt" aria-hidden /> 会計
         </button>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { usePosStore } from '@/store/posStore'
 import { calcBill, calcFee } from '@/lib/tax'
 import type { PayMethod } from '@/types'
@@ -16,12 +16,18 @@ interface Props {
 }
 
 export default function CheckoutScreen({ onBack }: Props) {
-  const { seats, currentSeatId, orders, feeSettings, completePayment, role, taxRate, taxMode } = usePosStore()
+  const { seats, currentSeatId, orders, feeSettings, completePayment, setCurrentSeat, role, taxRate, taxMode } = usePosStore()
   const isOwner = role === 'owner'
   const taxIncluded = taxMode === 'inclusive'
   const taxPct = Math.round(taxRate * 100)
   const seat = seats.find((s) => s.id === currentSeatId)
   const items = currentSeatId ? (orders[currentSeatId] ?? []) : []
+
+  // 未会計の卓（明細のある卓）
+  const unpaidSeats = seats.filter((s) => (orders[s.id]?.length ?? 0) > 0)
+  const unpaidIds = unpaidSeats.map((s) => s.id).join(',')
+  const seatTotal = (id: string) =>
+    calcBill((orders[id] ?? []).reduce((a, x) => a + x.priceExTax * x.qty, 0), taxRate, taxMode).total
 
   const base = items.reduce((s, x) => s + x.priceExTax * x.qty, 0)
   const { subtotal, tax: taxAmt, total: totalAmt } = calcBill(base, taxRate, taxMode)
@@ -29,6 +35,14 @@ export default function CheckoutScreen({ onBack }: Props) {
   const [payMethod, setPayMethod] = useState<PayMethod>('cash')
   const [cashReceived, setCashReceived] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
+
+  // 現在の卓に明細が無ければ、未会計の卓を自動で選ぶ
+  useEffect(() => {
+    if (items.length === 0 && unpaidSeats.length > 0) setCurrentSeat(unpaidSeats[0].id)
+  }, [items.length, unpaidIds, unpaidSeats, setCurrentSeat])
+
+  // 卓を切り替えたらお預かり金額をリセット
+  useEffect(() => { setCashReceived(null) }, [currentSeatId])
 
   const feeRate = payMethod === 'card' ? feeSettings.card : payMethod === 'qr' ? feeSettings.qr : 0
   const feeAmt = calcFee(totalAmt, feeRate)
@@ -57,11 +71,33 @@ export default function CheckoutScreen({ onBack }: Props) {
     <div className="checkout-screen">
       <div className="checkout-top">
         <span className="checkout-title">
-          {seat?.name || `席 ${seat?.id}`} の会計
+          {unpaidSeats.length === 0 ? '会計' : `${seat?.name || `席 ${seat?.id}`} の会計`}
         </span>
-        <button className="back-btn" onClick={onBack}>← 戻る</button>
+        <button className="back-btn" onClick={onBack}>← 注文へ</button>
       </div>
 
+      {/* 未会計の卓を選択 */}
+      <div className="checkout-seats">
+        {unpaidSeats.length === 0 ? (
+          <span className="checkout-seats-empty">未会計の卓はありません</span>
+        ) : (
+          unpaidSeats.map((s) => (
+            <button
+              key={s.id}
+              className={`seat-chip ${s.id === currentSeatId ? 'active' : ''}`}
+              onClick={() => setCurrentSeat(s.id)}
+            >
+              {s.solo && <span className="solo-dot" />}
+              {s.name || `席 ${s.id}`}
+              <span className="chip-total">¥{seatTotal(s.id).toLocaleString()}</span>
+            </button>
+          ))
+        )}
+      </div>
+
+      {unpaidSeats.length === 0 ? (
+        <div className="loading">注文入力で明細を追加すると、ここに会計する卓が表示されます。</div>
+      ) : (
       <div className="checkout-body">
         {/* 左：注文内容 */}
         <div className="co-left">
@@ -165,6 +201,7 @@ export default function CheckoutScreen({ onBack }: Props) {
           </button>
         </div>
       </div>
+      )}
     </div>
   )
 }

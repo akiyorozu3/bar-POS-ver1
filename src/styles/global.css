@@ -97,6 +97,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .checkout-top { padding: 9px 14px; border-bottom: 0.5px solid #e0ddd5; background: #f8f7f4; display: flex; align-items: center; justify-content: space-between; }
 .checkout-title { font-size: 13px; font-weight: 500; color: #1a1a18; }
 .back-btn { font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 0.5px solid #e0ddd5; background: transparent; color: #5f5e5a; cursor: pointer; font-family: inherit; }
+.checkout-seats { display: flex; gap: 5px; padding: 7px 10px; border-bottom: 0.5px solid #e0ddd5; background: #f8f7f4; overflow-x: auto; align-items: center; }
+.checkout-seats-empty { font-size: 11px; color: #888780; }
+.chip-total { font-size: 10px; opacity: .8; margin-left: 5px; }
 .checkout-body { display: grid; grid-template-columns: 1fr 1fr; flex: 1; overflow: hidden; }
 .co-left { padding: 10px 12px; overflow-y: auto; border-right: 0.5px solid #e0ddd5; display: flex; flex-direction: column; gap: 2px; }
 .co-section-lbl { font-size: 10px; color: #888780; text-transform: uppercase; letter-spacing: .06em; margin: 5px 0 2px; }
