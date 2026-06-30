@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { usePosStore } from '@/store/posStore'
-import { calcTax, calcFee } from '@/lib/tax'
+import { calcBill, calcFee } from '@/lib/tax'
 import type { PayMethod } from '@/types'
 
 const PAY_DEFS: { k: PayMethod; label: string; icon: string }[] = [
@@ -16,14 +16,15 @@ interface Props {
 }
 
 export default function CheckoutScreen({ onBack }: Props) {
-  const { seats, currentSeatId, orders, feeSettings, completePayment, role } = usePosStore()
+  const { seats, currentSeatId, orders, feeSettings, completePayment, role, taxRate, taxMode } = usePosStore()
   const isOwner = role === 'owner'
+  const taxIncluded = taxMode === 'inclusive'
+  const taxPct = Math.round(taxRate * 100)
   const seat = seats.find((s) => s.id === currentSeatId)
   const items = currentSeatId ? (orders[currentSeatId] ?? []) : []
 
-  const subtotal = items.reduce((s, x) => s + x.priceExTax * x.qty, 0)
-  const taxAmt = calcTax(subtotal)
-  const totalAmt = subtotal + taxAmt
+  const base = items.reduce((s, x) => s + x.priceExTax * x.qty, 0)
+  const { subtotal, tax: taxAmt, total: totalAmt } = calcBill(base, taxRate, taxMode)
 
   const [payMethod, setPayMethod] = useState<PayMethod>('cash')
   const [cashReceived, setCashReceived] = useState<number | null>(null)
@@ -74,12 +75,16 @@ export default function CheckoutScreen({ onBack }: Props) {
               </span>
             </div>
           ))}
-          <div className="co-subtotal">
-            <span>小計 (税抜)</span><span>¥{subtotal.toLocaleString()}</span>
-          </div>
-          <div className="co-tax">
-            <span>消費税 (10%)</span><span>¥{taxAmt.toLocaleString()}</span>
-          </div>
+          {!taxIncluded && (
+            <>
+              <div className="co-subtotal">
+                <span>小計 (税抜)</span><span>¥{subtotal.toLocaleString()}</span>
+              </div>
+              <div className="co-tax">
+                <span>消費税 ({taxPct}%)</span><span>¥{taxAmt.toLocaleString()}</span>
+              </div>
+            </>
+          )}
           <div className="co-total">
             <span className="co-total-lbl">合計</span>
             <span className="co-total-val">¥{totalAmt.toLocaleString()}</span>

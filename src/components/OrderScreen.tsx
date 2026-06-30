@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { usePosStore } from '@/store/posStore'
-import { toTaxInc } from '@/lib/tax'
+import { displayUnit, calcBill } from '@/lib/tax'
 import { FREE_PRESETS, MENU_CATEGORIES } from '@/lib/defaultMenus'
 import type { MenuItem } from '@/types'
 
@@ -11,6 +11,7 @@ export default function OrderScreen() {
     seats, currentSeatId, orders,
     addSeat, updateSeat, setCurrentSeat,
     menus, casts, addOrderItem, changeQty, changeItemCast, toggleItemFullBack, clearOrder, setSeatCast,
+    taxRate, taxMode,
   } = usePosStore()
 
   const [tab, setTab] = useState<Tab>('セット')
@@ -18,12 +19,14 @@ export default function OrderScreen() {
   const [freeName, setFreeName] = useState('')
   const [freePrice, setFreePrice] = useState('')
 
+  const taxIncluded = taxMode === 'inclusive'
+  const taxPct = Math.round(taxRate * 100)
+
   const seat = seats.find((s) => s.id === currentSeatId)
   const currentOrder = currentSeatId ? (orders[currentSeatId] ?? []) : []
 
-  const subtotal = currentOrder.reduce((s, x) => s + x.priceExTax * x.qty, 0)
-  const taxAmt = Math.floor(subtotal * 0.1)
-  const totalAmt = subtotal + taxAmt
+  const base = currentOrder.reduce((s, x) => s + x.priceExTax * x.qty, 0)
+  const { subtotal, tax: taxAmt, total: totalAmt } = calcBill(base, taxRate, taxMode)
 
   const todayMenus = menus.filter((m) => m.isToday)
   const tabMenus: MenuItem[] =
@@ -104,7 +107,7 @@ export default function OrderScreen() {
           {/* メニューグリッド */}
           {tab === 'フリー入力' ? (
             <div className="free-area">
-              <p className="free-title">品名と金額（税抜）を入力</p>
+              <p className="free-title">品名と金額（{taxIncluded ? '税込' : '税抜'}）を入力</p>
               <div className="free-row">
                 <input
                   className="free-name-input"
@@ -140,7 +143,7 @@ export default function OrderScreen() {
                     {p.name}
                     <br />
                     <span style={{ fontSize: 9, color: 'var(--text-accent)' }}>
-                      ¥{toTaxInc(p.priceExTax).toLocaleString()}
+                      ¥{displayUnit(p.priceExTax, taxRate, taxMode).toLocaleString()}
                     </span>
                   </button>
                 ))}
@@ -168,7 +171,7 @@ export default function OrderScreen() {
                 >
                   {m.isToday && <span className="today-tag">本日</span>}
                   <div className="m-name">{m.name}</div>
-                  <div className="m-price">¥{toTaxInc(m.priceExTax).toLocaleString()}</div>
+                  <div className="m-price">¥{displayUnit(m.priceExTax, taxRate, taxMode).toLocaleString()}</div>
                 </button>
               ))}
             </div>
@@ -248,16 +251,20 @@ export default function OrderScreen() {
           </div>
 
           <div className="ticket-foot">
-            <div className="foot-line">
-              <span className="foot-lbl">小計 (税抜)</span>
-              <span className="foot-val">¥{subtotal.toLocaleString()}</span>
-            </div>
-            <div className="foot-line">
-              <span className="foot-lbl">消費税 (10%)</span>
-              <span className="foot-val">¥{taxAmt.toLocaleString()}</span>
-            </div>
+            {!taxIncluded && (
+              <>
+                <div className="foot-line">
+                  <span className="foot-lbl">小計 (税抜)</span>
+                  <span className="foot-val">¥{subtotal.toLocaleString()}</span>
+                </div>
+                <div className="foot-line">
+                  <span className="foot-lbl">消費税 ({taxPct}%)</span>
+                  <span className="foot-val">¥{taxAmt.toLocaleString()}</span>
+                </div>
+              </>
+            )}
             <div className="total-line">
-              <span className="total-lbl">合計 (税込)</span>
+              <span className="total-lbl">合計{taxIncluded ? '' : ' (税込)'}</span>
               <span className="total-val">¥{totalAmt.toLocaleString()}</span>
             </div>
             <div className="foot-btns">
@@ -287,7 +294,8 @@ export default function OrderScreen() {
 
 // ── 本日メニュー管理モーダル ─────────────────────
 function TodayMenuModal({ onClose }: { onClose: () => void }) {
-  const { menus, addMenu, deleteMenu } = usePosStore()
+  const { menus, addMenu, deleteMenu, taxRate, taxMode } = usePosStore()
+  const taxIncluded = taxMode === 'inclusive'
   const todayMenus = menus.filter((m) => m.isToday)
   const [name, setName] = useState('')
   const [price, setPrice] = useState('')
@@ -328,7 +336,7 @@ function TodayMenuModal({ onClose }: { onClose: () => void }) {
         <div className="modal-title">本日のメニュー</div>
         <label>メニュー名</label>
         <input placeholder="例：本日のおすすめカクテル" value={name} onChange={(e) => setName(e.target.value)} />
-        <label>価格（税抜）</label>
+        <label>価格（{taxIncluded ? '税込' : '税抜'}）</label>
         <input type="number" min="0" placeholder="例：800" value={price} onChange={(e) => setPrice(e.target.value)} />
         <button
           className="modal-btn ok"
@@ -347,7 +355,7 @@ function TodayMenuModal({ onClose }: { onClose: () => void }) {
             : todayMenus.map((m) => (
               <div key={m.id} className="today-menu-row">
                 <span className="tm-name">{m.name}</span>
-                <span className="tm-price">¥{toTaxInc(m.priceExTax).toLocaleString()}</span>
+                <span className="tm-price">¥{displayUnit(m.priceExTax, taxRate, taxMode).toLocaleString()}</span>
                 <button className="tm-del" onClick={() => handleDelete(m.id)} disabled={busy}>削除</button>
               </div>
             ))

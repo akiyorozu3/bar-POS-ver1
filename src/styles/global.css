@@ -159,6 +159,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .fee-input { width: 60px; padding: 4px 6px; border: 0.5px solid #ccc; border-radius: 6px; background: #fff; color: #1a1a18; font-size: 12px; font-family: inherit; text-align: right; outline: none; }
 .fee-pct { font-size: 11px; color: #888780; }
 .cat-rate-title { font-size: 10px; color: #888780; margin: 10px 0 4px; padding-top: 8px; border-top: 0.5px solid #e0ddd5; }
+.tax-mode-sel { font-size: 11px; border: 0.5px solid #ccc; border-radius: 6px; padding: 4px 6px; background: #fff; color: #1a1a18; font-family: inherit; cursor: pointer; }
 .sync-info { background: #f8f7f4; border: 0.5px solid #378add; border-radius: 8px; padding: 10px 12px; }
 .sync-info-title { font-size: 11px; font-weight: 500; color: #185fa5; display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .sync-info-body { font-size: 11px; color: #5f5e5a; line-height: 1.7; }

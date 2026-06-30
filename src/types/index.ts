@@ -43,6 +43,14 @@ export type PayMethod = 'cash' | 'card' | 'qr'
 // ── ユーザー権限 ─────────────────────────────────
 export type Role = 'owner' | 'staff'
 
+// ── 税の扱い ─────────────────────────────────────
+// exclusive: 税抜で登録し会計時に加算 / inclusive: 税込で登録し加算しない
+export type TaxMode = 'exclusive' | 'inclusive'
+export interface TaxSettings {
+  rate: number   // 税率（0.10 = 10%）
+  mode: TaxMode
+}
+
 // ── 取引（会計完了済み） ─────────────────────────
 export interface Transaction {
   id: string

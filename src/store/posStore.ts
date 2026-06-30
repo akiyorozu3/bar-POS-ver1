@@ -30,9 +30,9 @@ import {
 } from 'firebase/auth'
 import { db, auth, COLLECTIONS } from '@/lib/firebase'
 import { idToEmail, emailToRole } from '@/lib/authConfig'
-import { calcTax, calcFee } from '@/lib/tax'
+import { calcBill, calcFee, DEFAULT_TAX_RATE } from '@/lib/tax'
 import { DEFAULT_MENUS } from '@/lib/defaultMenus'
-import type { Seat, OrderItem, MenuItem, Cast, Transaction, FeeSettings, PayMethod, Role } from '@/types'
+import type { Seat, OrderItem, MenuItem, Cast, Transaction, FeeSettings, PayMethod, Role, TaxMode, TaxSettings } from '@/types'
 
 // 初期投入用のデフォルトキャスト（実データは Firestore で管理）
 export const DEFAULT_CASTS = ['さくら', 'あおい', 'ひなた', 'れいな']
@@ -73,6 +73,10 @@ interface PosState {
 
   // カテゴリ別バック率（例 { 'キャストドリンク': 0.5 }。未設定は backRate を使う）
   categoryRates: Record<string, number>
+
+  // 消費税の扱い
+  taxRate: number      // 0.10 = 10%
+  taxMode: TaxMode
 
   // 認証アクション
   initAuth: () => () => void
@@ -121,6 +125,9 @@ interface PosState {
 
   saveCategoryRates: (rates: Record<string, number>) => Promise<void>
   loadCategoryRates: () => Promise<void>
+
+  saveTaxSettings: (settings: TaxSettings) => Promise<void>
+  loadTaxSettings: () => Promise<void>
 }
 
 let seatCounter = 0
@@ -150,6 +157,8 @@ export const usePosStore = create<PosState>((set, get) => ({
   feeSettings: { card: 3.25, qr: 1.98 },
   backRate: BACK_RATE,
   categoryRates: {},
+  taxRate: DEFAULT_TAX_RATE,
+  taxMode: 'exclusive',
 
   // ── 認証 ─────────────────────────────────────
   initAuth: () => {
@@ -320,16 +329,15 @@ export const usePosStore = create<PosState>((set, get) => ({
 
   // ── 会計確定 → Firestore書き込み ─────────────
   completePayment: async (seatId, payMethod, _cashReceived) => {
-    const { seats, orders, feeSettings } = get()
+    const { seats, orders, feeSettings, taxRate, taxMode } = get()
     const seat = seats.find((s) => s.id === seatId)
     if (!seat) return
 
     const items = orders[seatId] ?? []
     if (!items.length) return
 
-    const subtotal = items.reduce((sum, x) => sum + x.priceExTax * x.qty, 0)
-    const tax = calcTax(subtotal)
-    const total = subtotal + tax
+    const base = items.reduce((sum, x) => sum + x.priceExTax * x.qty, 0)
+    const { subtotal, tax, total } = calcBill(base, taxRate, taxMode)
 
     const feeRate =
       payMethod === 'card' ? feeSettings.card :
@@ -434,6 +442,20 @@ export const usePosStore = create<PosState>((set, get) => ({
     const snap = await getDoc(doc(db, COLLECTIONS.SETTINGS, 'categoryRates'))
     if (snap.exists()) {
       set({ categoryRates: snap.data() as Record<string, number> })
+    }
+  },
+
+  // ── 消費税設定の永続化 ─────────────────────────
+  saveTaxSettings: async (settings) => {
+    set({ taxRate: settings.rate, taxMode: settings.mode })
+    await setDoc(doc(db, COLLECTIONS.SETTINGS, 'tax'), settings)
+  },
+
+  loadTaxSettings: async () => {
+    const snap = await getDoc(doc(db, COLLECTIONS.SETTINGS, 'tax'))
+    if (snap.exists()) {
+      const d = snap.data() as TaxSettings
+      set({ taxRate: d.rate, taxMode: d.mode })
     }
   },
 }))

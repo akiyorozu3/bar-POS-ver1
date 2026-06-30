@@ -29,13 +29,15 @@ function periodRange(period: Period): [Date, Date] {
 }
 
 export default function SalesScreen() {
-  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, saveBackRate, categoryRates, saveCategoryRates } = usePosStore()
+  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, saveBackRate, categoryRates, saveCategoryRates, taxRate, taxMode, saveTaxSettings } = usePosStore()
   const [period, setPeriod] = useState<Period>('today')
   const [showFeePanel, setShowFeePanel] = useState(false)
   const [showSyncPanel, setShowSyncPanel] = useState(false)
   const [cardFee, setCardFee] = useState(String(feeSettings.card))
   const [qrFee, setQrFee] = useState(String(feeSettings.qr))
   const [backPct, setBackPct] = useState(String(Math.round(backRate * 100)))
+  const [taxPct, setTaxPct] = useState(String(Math.round(taxRate * 100)))
+  const [taxModeLocal, setTaxModeLocal] = useState(taxMode)
   // カテゴリ別バック率（%文字列。空欄＝基本バック率を使う）
   const catToStr = (rates: Record<string, number>) =>
     Object.fromEntries(MENU_CATEGORIES.map((c) => [c, c in rates ? String(Math.round(rates[c] * 100)) : '']))
@@ -55,9 +57,12 @@ export default function SalesScreen() {
   useEffect(() => { setBackPct(String(Math.round(backRate * 100))) }, [backRate])
   useEffect(() => { setCardFee(String(feeSettings.card)); setQrFee(String(feeSettings.qr)) }, [feeSettings])
   useEffect(() => { setCatPct(catToStr(categoryRates)) }, [categoryRates])
+  useEffect(() => { setTaxPct(String(Math.round(taxRate * 100))) }, [taxRate])
+  useEffect(() => { setTaxModeLocal(taxMode) }, [taxMode])
 
   const handleSaveFee = async () => {
     const pct = Math.min(100, Math.max(0, parseFloat(backPct) || 0))
+    const tPct = Math.min(100, Math.max(0, parseFloat(taxPct) || 0))
     // 空欄は除外し、入力されたカテゴリだけ率を保存
     const rates: Record<string, number> = {}
     for (const c of MENU_CATEGORIES) {
@@ -70,6 +75,7 @@ export default function SalesScreen() {
       saveFeeSettings({ card: parseFloat(cardFee) || 0, qr: parseFloat(qrFee) || 0 }),
       saveBackRate(pct / 100),
       saveCategoryRates(rates),
+      saveTaxSettings({ rate: tPct / 100, mode: taxModeLocal }),
     ])
     setFeeSaved(true)
     setTimeout(() => setFeeSaved(false), 2000)
@@ -117,8 +123,27 @@ export default function SalesScreen() {
         {showFeePanel && (
           <div className="fee-settings">
             <div className="fee-settings-title">
-              <i className="ti ti-settings" aria-hidden /> 手数料・バック率の設定
+              <i className="ti ti-settings" aria-hidden /> 手数料・バック率・消費税の設定
             </div>
+
+            <div className="fee-row">
+              <span className="fee-row-lbl"><i className="ti ti-receipt-tax" aria-hidden /> 価格・消費税の扱い</span>
+              <select className="tax-mode-sel" value={taxModeLocal}
+                onChange={(e) => setTaxModeLocal(e.target.value as typeof taxModeLocal)}>
+                <option value="inclusive">税込で登録・加算しない</option>
+                <option value="exclusive">税抜で登録・会計時に加算</option>
+              </select>
+            </div>
+            <div className="fee-row">
+              <span className="fee-row-lbl">消費税率{taxModeLocal === 'inclusive' ? '（税抜時のみ使用）' : ''}</span>
+              <div className="fee-input-wrap">
+                <input className="fee-input" type="number" min="0" max="100" step="1"
+                  value={taxPct} onChange={(e) => setTaxPct(e.target.value)} />
+                <span className="fee-pct">%</span>
+              </div>
+            </div>
+
+            <div className="cat-rate-title">決済手数料・バック率</div>
             <div className="fee-row">
               <span className="fee-row-lbl"><i className="ti ti-credit-card" aria-hidden /> カード手数料</span>
               <div className="fee-input-wrap">

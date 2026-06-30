@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { usePosStore } from '@/store/posStore'
-import { toTaxInc } from '@/lib/tax'
+import { displayUnit } from '@/lib/tax'
 import { MENU_CATEGORIES } from '@/lib/defaultMenus'
 import type { MenuItem } from '@/types'
 
 type AddCategory = typeof MENU_CATEGORIES[number] | '本日限定'
 
 export default function MenuManageScreen() {
-  const { menus, menusLoading, addMenu, seedDefaultMenus } = usePosStore()
+  const { menus, menusLoading, addMenu, seedDefaultMenus, taxRate, taxMode } = usePosStore()
+  const taxIncluded = taxMode === 'inclusive'
 
   const [name, setName] = useState('')
   const [price, setPrice] = useState('')
@@ -92,14 +93,14 @@ export default function MenuManageScreen() {
               className="mm-add-price"
               type="number"
               min="0"
-              placeholder="金額（税抜）"
+              placeholder={taxIncluded ? '金額（税込）' : '金額（税抜）'}
               value={price}
               onChange={(e) => setPrice(e.target.value)}
             />
             <button className="mm-add-btn" onClick={handleAdd} disabled={!canAdd || busy}>＋ 追加</button>
           </div>
-          {price !== '' && parseInt(price, 10) > 0 && (
-            <div className="mm-add-hint">税込 ¥{toTaxInc(parseInt(price, 10)).toLocaleString()}</div>
+          {!taxIncluded && price !== '' && parseInt(price, 10) > 0 && (
+            <div className="mm-add-hint">税込 ¥{displayUnit(parseInt(price, 10), taxRate, taxMode).toLocaleString()}</div>
           )}
         </div>
 
@@ -132,7 +133,8 @@ export default function MenuManageScreen() {
 
 // ── 1行（インライン編集 + 削除） ─────────────────
 function MenuRow({ menu }: { menu: MenuItem }) {
-  const { updateMenu, deleteMenu } = usePosStore()
+  const { updateMenu, deleteMenu, taxRate, taxMode } = usePosStore()
+  const taxIncluded = taxMode === 'inclusive'
   const [name, setName] = useState(menu.name)
   const [price, setPrice] = useState(String(menu.priceExTax))
   const [busy, setBusy] = useState(false)
@@ -171,7 +173,11 @@ function MenuRow({ menu }: { menu: MenuItem }) {
         value={price}
         onChange={(e) => setPrice(e.target.value)}
       />
-      <span className="mm-row-inc">税込 ¥{Number.isFinite(priceNum) ? toTaxInc(priceNum).toLocaleString() : '—'}</span>
+      <span className="mm-row-inc">
+        {taxIncluded
+          ? '税込'
+          : `税込 ¥${Number.isFinite(priceNum) ? displayUnit(priceNum, taxRate, taxMode).toLocaleString() : '—'}`}
+      </span>
       <button className="mm-row-save" onClick={handleSave} disabled={!dirty || !valid || busy}>保存</button>
       <button className="mm-row-del" onClick={handleDelete} disabled={busy}>削除</button>
     </div>
