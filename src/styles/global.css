@@ -233,9 +233,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 
 /* ── トップバー ───────────────────────────────── */
 .topbar { display: flex; align-items: center; justify-content: space-between; padding: 5px 12px; background: #1a1a18; }
+.topbar.backdated { background: #854f0b; }
 .topbar-role { font-size: 11px; color: #fff; font-weight: 500; display: flex; align-items: center; gap: 5px; }
 .topbar-role::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #639922; }
-.logout-btn { font-size: 11px; padding: 3px 10px; border-radius: 14px; border: 0.5px solid #555; background: transparent; color: #ddd; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 4px; }
+.topbar-date { display: flex; align-items: center; gap: 6px; color: #fff; font-size: 11px; }
+.topbar-date-lbl { white-space: nowrap; opacity: .9; }
+.topbar.backdated .topbar-date-lbl { font-weight: 700; color: #ffe0a8; }
+.topbar-date input { font-size: 12px; padding: 2px 6px; border-radius: 6px; border: 0.5px solid #555; background: #2a2a28; color: #fff; font-family: inherit; }
+.topbar.backdated .topbar-date input { background: #fff; color: #1a1a18; border-color: #ffce85; }
+.topbar-date-today { font-size: 10px; padding: 2px 8px; border-radius: 10px; border: none; background: #fff; color: #854f0b; cursor: pointer; font-family: inherit; font-weight: 500; white-space: nowrap; }
+.logout-btn { font-size: 11px; padding: 3px 10px; border-radius: 14px; border: 0.5px solid #555; background: transparent; color: #ddd; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 
 /* ── メニュー管理画面 ────────────────────────── */
 .menu-manage { display: flex; flex-direction: column; flex: 1; overflow: hidden; }

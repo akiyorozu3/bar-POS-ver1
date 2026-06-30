@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { usePosStore } from '@/store/posStore'
+import { usePosStore, todayStr } from '@/store/posStore'
 import OrderScreen from '@/components/OrderScreen'
 import CheckoutScreen from '@/components/CheckoutScreen'
 import SalesScreen from '@/components/SalesScreen'
@@ -23,9 +23,11 @@ export default function App() {
     user, role, authReady,
     initAuth, signOutUser,
     subscribeMenus, subscribeCasts, subscribeTables, loadFeeSettings, loadBackRate, loadCategoryRates, loadTaxSettings,
+    entryDate, setEntryDate,
   } = usePosStore()
 
   const isOwner = role === 'owner'
+  const backdated = entryDate !== todayStr()
 
   // 認証状態の購読（初回マウント時）
   useEffect(() => {
@@ -67,10 +69,22 @@ export default function App() {
   return (
     <div className="app">
       {/* トップバー（ユーザー情報・ログアウト） */}
-      <div className="topbar">
+      <div className={`topbar ${backdated ? 'backdated' : ''}`}>
         <span className="topbar-role">
           {isOwner ? 'オーナー' : 'スタッフ'}
         </span>
+        <label className="topbar-date">
+          <span className="topbar-date-lbl">{backdated ? '遡及入力 ⚠' : '日付'}</span>
+          <input
+            type="date"
+            value={entryDate}
+            max={todayStr()}
+            onChange={(e) => setEntryDate(e.target.value)}
+          />
+          {backdated && (
+            <button className="topbar-date-today" onClick={() => setEntryDate(todayStr())}>今日に戻す</button>
+          )}
+        </label>
         <button className="logout-btn" onClick={signOutUser}>
           <i className="ti ti-logout" aria-hidden /> ログアウト
         </button>

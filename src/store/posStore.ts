@@ -81,6 +81,9 @@ interface PosState {
   taxRate: number      // 0.10 = 10%
   taxMode: TaxMode
 
+  // 入力日（会計を記録する日付。YYYY-MM-DD。遡及入力用に変更可）
+  entryDate: string
+
   // 認証アクション
   initAuth: () => () => void
   signIn: (id: string, password: string) => Promise<void>
@@ -100,6 +103,7 @@ interface PosState {
   seedDefaultCasts: () => Promise<void>
 
   // アクション
+  setEntryDate: (date: string) => void
   addSeat: (name: string, solo: boolean) => void
   updateSeat: (id: string, patch: Partial<Seat>) => void
   setTableCasts: (seatId: string, casts: string[]) => void
@@ -136,6 +140,21 @@ interface PosState {
 let seatCounter = 0
 const newSeatId = () => `seat-${++seatCounter}-${Date.now()}`
 const newItemId = () => `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+
+// YYYY-MM-DD（ローカル日付）
+export const todayStr = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+// 入力日（entryDate, YYYY-MM-DD）から会計時刻を作る。今日ならそのまま現在時刻、過去日ならその日付＋現在時刻
+const entryDateToTs = (entryDate: string): number => {
+  if (entryDate === todayStr()) return Date.now()
+  const d = new Date(`${entryDate}T00:00:00`)
+  if (isNaN(d.getTime())) return Date.now()
+  const now = new Date()
+  d.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds())
+  return d.getTime()
+}
 
 // 選択中の席を端末に記憶（リロード後に同じ席へ戻る）
 const SEAT_KEY = 'pos:seat'
@@ -191,6 +210,7 @@ export const usePosStore = create<PosState>((set, get) => {
   categoryRates: {},
   taxRate: DEFAULT_TAX_RATE,
   taxMode: 'exclusive',
+  entryDate: todayStr(),
 
   // ── 認証 ─────────────────────────────────────
   initAuth: () => {
@@ -301,6 +321,8 @@ export const usePosStore = create<PosState>((set, get) => {
     persistTable(seatId)
   },
 
+  setEntryDate: (date) => set({ entryDate: date || todayStr() }),
+
   setCurrentSeat: (id) => { set({ currentSeatId: id }); persistSeatId(id) },
 
   // ── 注文 ─────────────────────────────────────
@@ -360,7 +382,7 @@ export const usePosStore = create<PosState>((set, get) => {
 
   // ── 会計確定 → Firestore書き込み ─────────────
   completePayment: async (seatId, payMethod, _cashReceived) => {
-    const { seats, orders, feeSettings, taxRate, taxMode } = get()
+    const { seats, orders, feeSettings, taxRate, taxMode, entryDate } = get()
     const seat = seats.find((s) => s.id === seatId)
     if (!seat) return
 
@@ -402,7 +424,7 @@ export const usePosStore = create<PosState>((set, get) => {
       netAmount,
       primaryCast,
       tableCasts,
-      completedAt: Date.now(),
+      completedAt: entryDateToTs(entryDate),
     }
 
     await addDoc(collection(db, COLLECTIONS.TRANSACTIONS), {
