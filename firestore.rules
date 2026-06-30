@@ -25,6 +25,11 @@ service cloud.firestore {
       allow write: if isOwner();
     }
 
+    // 席・未会計の注文：ログイン済みなら読み書き可（スタッフが注文を取るため）
+    match /tables/{id} {
+      allow read, write: if isAuthed();
+    }
+
     // 手数料設定：ログイン済みは閲覧可（会計計算に必要） / 変更はオーナーのみ
     match /settings/{id} {
       allow read: if isAuthed();

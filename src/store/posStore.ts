@@ -115,6 +115,7 @@ interface PosState {
   ) => Promise<void>
 
   subscribeMenus: () => () => void
+  subscribeTables: () => () => void
   subscribeTransactions: (from: Date, to: Date) => () => void
 
   saveFeeSettings: (settings: FeeSettings) => Promise<void>
@@ -134,7 +135,26 @@ let seatCounter = 0
 const newSeatId = () => `seat-${++seatCounter}-${Date.now()}`
 const newItemId = () => `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 
-export const usePosStore = create<PosState>((set, get) => ({
+export const usePosStore = create<PosState>((set, get) => {
+  // 席・未会計注文を Firestore へ保存（fire-and-forget。ローカルは楽観更新済み）
+  const persistTable = (seatId: string) => {
+    const { seats, orders } = get()
+    const seat = seats.find((s) => s.id === seatId)
+    if (!seat) {
+      deleteDoc(doc(db, COLLECTIONS.TABLES, seatId)).catch(() => {})
+      return
+    }
+    setDoc(doc(db, COLLECTIONS.TABLES, seatId), {
+      name: seat.name,
+      solo: seat.solo,
+      defaultCast: seat.defaultCast,
+      items: orders[seatId] ?? [],
+      createdAt: seat.createdAt,
+      updatedAt: Date.now(),
+    }).catch(() => {})
+  }
+
+  return {
   user: null,
   role: null,
   authReady: false,
@@ -250,22 +270,27 @@ export const usePosStore = create<PosState>((set, get) => ({
       orders: { ...s.orders, [id]: [] },
       currentSeatId: id,
     }))
+    persistTable(id)
   },
 
-  updateSeat: (id, patch) =>
+  updateSeat: (id, patch) => {
     set((s) => ({
       seats: s.seats.map((seat) => (seat.id === id ? { ...seat, ...patch } : seat)),
-    })),
+    }))
+    persistTable(id)
+  },
 
   // 席の担当キャストを変更し、その席の注文中の全商品にも担当を反映する
-  setSeatCast: (seatId, cast) =>
+  setSeatCast: (seatId, cast) => {
     set((s) => ({
       seats: s.seats.map((seat) => (seat.id === seatId ? { ...seat, defaultCast: cast } : seat)),
       orders: {
         ...s.orders,
         [seatId]: (s.orders[seatId] ?? []).map((x) => ({ ...x, cast })),
       },
-    })),
+    }))
+    persistTable(seatId)
+  },
 
   setCurrentSeat: (id) => set({ currentSeatId: id }),
 
@@ -294,17 +319,20 @@ export const usePosStore = create<PosState>((set, get) => ({
         },
       }
     })
+    persistTable(seatId)
   },
 
-  changeQty: (seatId, itemId, delta) =>
+  changeQty: (seatId, itemId, delta) => {
     set((s) => {
       const next = (s.orders[seatId] ?? [])
         .map((x) => (x.id === itemId ? { ...x, qty: x.qty + delta } : x))
         .filter((x) => x.qty > 0)
       return { orders: { ...s.orders, [seatId]: next } }
-    }),
+    })
+    persistTable(seatId)
+  },
 
-  changeItemCast: (seatId, itemId, cast) =>
+  changeItemCast: (seatId, itemId, cast) => {
     set((s) => ({
       orders: {
         ...s.orders,
@@ -312,9 +340,11 @@ export const usePosStore = create<PosState>((set, get) => ({
           x.id === itemId ? { ...x, cast } : x
         ),
       },
-    })),
+    }))
+    persistTable(seatId)
+  },
 
-  toggleItemFullBack: (seatId, itemId) =>
+  toggleItemFullBack: (seatId, itemId) => {
     set((s) => ({
       orders: {
         ...s.orders,
@@ -322,10 +352,14 @@ export const usePosStore = create<PosState>((set, get) => ({
           x.id === itemId ? { ...x, fullBack: !x.fullBack } : x
         ),
       },
-    })),
+    }))
+    persistTable(seatId)
+  },
 
-  clearOrder: (seatId) =>
-    set((s) => ({ orders: { ...s.orders, [seatId]: [] } })),
+  clearOrder: (seatId) => {
+    set((s) => ({ orders: { ...s.orders, [seatId]: [] } }))
+    persistTable(seatId)
+  },
 
   // ── 会計確定 → Firestore書き込み ─────────────
   completePayment: async (seatId, payMethod, _cashReceived) => {
@@ -375,11 +409,52 @@ export const usePosStore = create<PosState>((set, get) => ({
       _createdAt: serverTimestamp(),
     })
 
-    // 注文をクリア
+    // 注文をクリア（席は残す）
     set((s) => ({ orders: { ...s.orders, [seatId]: [] } }))
+    persistTable(seatId)
   },
 
   // ── Firestore 購読 ────────────────────────────
+  subscribeTables: () => {
+    const q = query(collection(db, COLLECTIONS.TABLES), orderBy('createdAt'))
+    const unsub = onSnapshot(q, (snap) => {
+      // 初回（空）はデフォルト席 A/B/C を作成（固定IDなので重複しない）
+      if (snap.empty) {
+        const now = Date.now()
+        ;['A', 'B', 'C'].forEach((id, i) => {
+          setDoc(doc(db, COLLECTIONS.TABLES, id), {
+            name: '', solo: false, defaultCast: '', items: [],
+            createdAt: now + i, updatedAt: now,
+          }).catch(() => {})
+        })
+        return
+      }
+      const seats: Seat[] = []
+      const orders: Record<string, OrderItem[]> = {}
+      snap.docs.forEach((d) => {
+        const data = d.data() as { name?: string; solo?: boolean; defaultCast?: string; items?: OrderItem[]; createdAt?: number }
+        seats.push({
+          id: d.id,
+          name: data.name ?? '',
+          solo: !!data.solo,
+          defaultCast: data.defaultCast ?? '',
+          createdAt: data.createdAt ?? 0,
+        })
+        orders[d.id] = data.items ?? []
+      })
+      set((s) => ({
+        seats,
+        orders,
+        currentSeatId: seats.some((x) => x.id === s.currentSeatId)
+          ? s.currentSeatId
+          : (seats[0]?.id ?? null),
+      }))
+    }, () => {
+      // 権限未設定（ルール未公開）等。ローカルの初期席のまま継続する
+    })
+    return unsub
+  },
+
   subscribeMenus: () => {
     set({ menusLoading: true })
     const q = query(collection(db, COLLECTIONS.MENUS), orderBy('sortOrder'))
@@ -458,4 +533,5 @@ export const usePosStore = create<PosState>((set, get) => ({
       set({ taxRate: d.rate, taxMode: d.mode })
     }
   },
-}))
+  }
+})

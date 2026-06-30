@@ -21,4 +21,5 @@ export const COLLECTIONS = {
   MENUS: 'menus',
   CASTS: 'casts',
   SETTINGS: 'settings',
+  TABLES: 'tables',
 } as const
