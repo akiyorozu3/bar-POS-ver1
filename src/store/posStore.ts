@@ -135,6 +135,15 @@ let seatCounter = 0
 const newSeatId = () => `seat-${++seatCounter}-${Date.now()}`
 const newItemId = () => `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 
+// 選択中の席を端末に記憶（リロード後に同じ席へ戻る）
+const SEAT_KEY = 'pos:seat'
+const readSeat = (): string => {
+  try { return localStorage.getItem(SEAT_KEY) || 'A' } catch { return 'A' }
+}
+const persistSeatId = (id: string | null) => {
+  try { if (id) localStorage.setItem(SEAT_KEY, id) } catch { /* ignore */ }
+}
+
 export const usePosStore = create<PosState>((set, get) => {
   // 席・未会計注文を Firestore へ保存（fire-and-forget。ローカルは楽観更新済み）
   const persistTable = (seatId: string) => {
@@ -166,7 +175,7 @@ export const usePosStore = create<PosState>((set, get) => {
     { id: 'B', name: '', solo: false, defaultCast: '', createdAt: Date.now() },
     { id: 'C', name: '', solo: false, defaultCast: '', createdAt: Date.now() },
   ],
-  currentSeatId: 'A',
+  currentSeatId: readSeat(),
   orders: { A: [], B: [], C: [] },
   menus: [],
   menusLoading: true,
@@ -270,6 +279,7 @@ export const usePosStore = create<PosState>((set, get) => {
       orders: { ...s.orders, [id]: [] },
       currentSeatId: id,
     }))
+    persistSeatId(id)
     persistTable(id)
   },
 
@@ -292,7 +302,7 @@ export const usePosStore = create<PosState>((set, get) => {
     persistTable(seatId)
   },
 
-  setCurrentSeat: (id) => set({ currentSeatId: id }),
+  setCurrentSeat: (id) => { set({ currentSeatId: id }); persistSeatId(id) },
 
   // ── 注文 ─────────────────────────────────────
   addOrderItem: (seatId, item) => {
@@ -442,13 +452,13 @@ export const usePosStore = create<PosState>((set, get) => {
         })
         orders[d.id] = data.items ?? []
       })
-      set((s) => ({
-        seats,
-        orders,
-        currentSeatId: seats.some((x) => x.id === s.currentSeatId)
+      set((s) => {
+        const nextCurrent = seats.some((x) => x.id === s.currentSeatId)
           ? s.currentSeatId
-          : (seats[0]?.id ?? null),
-      }))
+          : (seats[0]?.id ?? null)
+        if (nextCurrent !== s.currentSeatId) persistSeatId(nextCurrent)
+        return { seats, orders, currentSeatId: nextCurrent }
+      })
     }, () => {
       // 権限未設定（ルール未公開）等。ローカルの初期席のまま継続する
     })

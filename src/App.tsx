@@ -9,8 +9,16 @@ import LoginScreen from '@/components/LoginScreen'
 
 type Screen = 'order' | 'checkout' | 'sales' | 'menu' | 'cast'
 
+const readScreen = (): Screen => {
+  try { return (localStorage.getItem('pos:screen') as Screen) || 'order' } catch { return 'order' }
+}
+
 export default function App() {
-  const [screen, setScreen] = useState<Screen>('order')
+  const [screen, setScreenRaw] = useState<Screen>(readScreen)
+  const setScreen = (s: Screen) => {
+    setScreenRaw(s)
+    try { localStorage.setItem('pos:screen', s) } catch { /* ignore */ }
+  }
   const {
     user, role, authReady,
     initAuth, signOutUser,
