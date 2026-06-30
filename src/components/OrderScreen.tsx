@@ -10,7 +10,7 @@ export default function OrderScreen() {
   const {
     seats, currentSeatId, orders,
     addSeat, updateSeat, setCurrentSeat,
-    menus, casts, addOrderItem, changeQty, changeItemCast, toggleItemFullBack, clearOrder, setSeatCast,
+    menus, casts, addOrderItem, changeQty, changeItemCast, clearOrder, setTableCasts,
     taxRate, taxMode,
   } = usePosStore()
 
@@ -40,11 +40,10 @@ export default function OrderScreen() {
       name: m.name,
       priceExTax: m.priceExTax,
       qty: 1,
-      cast: seat?.defaultCast ?? '',
+      cast: '',
       category: m.category,
       isToday: m.isToday,
       isFree: false,
-      fullBack: false,
     })
   }
 
@@ -54,11 +53,10 @@ export default function OrderScreen() {
       name: freeName,
       priceExTax: parseInt(freePrice),
       qty: 1,
-      cast: seat?.defaultCast ?? '',
+      cast: '',
       category: 'フリー入力',
       isToday: false,
       isFree: true,
-      fullBack: false,
     })
     setFreeName('')
     setFreePrice('')
@@ -135,8 +133,8 @@ export default function OrderScreen() {
                       if (!currentSeatId) return
                       addOrderItem(currentSeatId, {
                         name: p.name, priceExTax: p.priceExTax, qty: 1,
-                        cast: seat?.defaultCast ?? '', category: 'フリー入力',
-                        isToday: false, isFree: true, fullBack: false,
+                        cast: '', category: 'フリー入力',
+                        isToday: false, isFree: true,
                       })
                     }}
                   >
@@ -196,15 +194,40 @@ export default function OrderScreen() {
               </button>
             </div>
             <div className="cast-row">
-              <span className="cast-lbl">担当キャスト</span>
-              <select
-                className="cast-sel"
-                value={seat?.defaultCast ?? ''}
-                onChange={(e) => seat && setSeatCast(seat.id, e.target.value)}
-              >
-                <option value="">担当未設定</option>
-                {casts.map((c) => <option key={c.id}>{c.name}</option>)}
-              </select>
+              <span className="cast-lbl">卓の担当</span>
+              <div className="table-casts">
+                {(() => {
+                  const list = seat && seat.tableCasts.length ? seat.tableCasts : ['']
+                  return list.map((tc, i) => (
+                    <div className="table-cast-item" key={i}>
+                      <select
+                        className="cast-sel"
+                        value={tc}
+                        onChange={(e) => {
+                          if (!seat) return
+                          const next = [...list]; next[i] = e.target.value
+                          setTableCasts(seat.id, next)
+                        }}
+                      >
+                        <option value="">担当未設定</option>
+                        {casts.map((c) => <option key={c.id}>{c.name}</option>)}
+                      </select>
+                      {list.length > 1 && (
+                        <button
+                          className="cast-remove"
+                          onClick={() => seat && setTableCasts(seat.id, list.filter((_, j) => j !== i))}
+                          title="この担当を外す"
+                        >×</button>
+                      )}
+                    </div>
+                  ))
+                })()}
+                <button
+                  className="cast-add"
+                  onClick={() => seat && setTableCasts(seat.id, [...(seat.tableCasts.length ? seat.tableCasts : ['']), ''])}
+                  title="担当を追加"
+                >＋担当</button>
+              </div>
             </div>
           </div>
 
@@ -227,24 +250,19 @@ export default function OrderScreen() {
                       ¥{(item.priceExTax * item.qty).toLocaleString()}
                     </span>
                   </div>
-                  <div className="t-cast-row">
-                    <span className="t-cast-lbl">担当：</span>
-                    <select
-                      className="t-cast-sel"
-                      value={item.cast}
-                      onChange={(e) => currentSeatId && changeItemCast(currentSeatId, item.id, e.target.value)}
-                    >
-                      <option value="">未設定</option>
-                      {casts.map((c) => <option key={c.id}>{c.name}</option>)}
-                    </select>
-                    <button
-                      className={`fullback-toggle ${item.fullBack ? 'on' : ''}`}
-                      onClick={() => currentSeatId && toggleItemFullBack(currentSeatId, item.id)}
-                      title="この商品だけ全額バックにする"
-                    >
-                      {item.fullBack ? '全額✓' : '全額'}
-                    </button>
-                  </div>
+                  {item.category === 'キャストドリンク' && (
+                    <div className="t-cast-row">
+                      <span className="t-cast-lbl">ドリンク担当：</span>
+                      <select
+                        className="t-cast-sel"
+                        value={item.cast}
+                        onChange={(e) => currentSeatId && changeItemCast(currentSeatId, item.id, e.target.value)}
+                      >
+                        <option value="">未設定</option>
+                        {casts.map((c) => <option key={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+                  )}
                 </div>
               ))
             )}

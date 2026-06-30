@@ -2,8 +2,8 @@
 export interface Seat {
   id: string
   name: string
-  solo: boolean        // 一人客フラグ
-  defaultCast: string  // 席のデフォルト担当キャスト
+  solo: boolean          // 一人客フラグ
+  tableCasts: string[]   // 卓の担当キャスト（複数可。卓バックを頭割り）
   createdAt: number
 }
 
@@ -13,11 +13,10 @@ export interface OrderItem {
   name: string
   priceExTax: number   // 税抜価格
   qty: number
-  cast: string         // 担当キャスト（空文字=未設定）
-  category: string     // バック率の判定に使うカテゴリ（フリー入力は'フリー入力'）
+  cast: string         // 担当キャスト（キャストドリンクのドリンクバック用。空文字=未設定）
+  category: string     // カテゴリ（キャストドリンク判定等。フリー入力は'フリー入力'）
   isToday: boolean     // 本日限定メニューフラグ
   isFree: boolean      // フリー入力フラグ
-  fullBack: boolean    // 全額バック（この商品だけ100%バック）
 }
 
 // ── キャスト ─────────────────────────────────────
@@ -64,8 +63,9 @@ export interface Transaction {
   feeRate: number      // 決済手数料率（%）
   feeAmount: number    // 手数料額
   netAmount: number    // 実入金額
-  primaryCast: string  // 売上が最も多いキャスト
-  completedAt: number  // Unix timestamp
+  primaryCast: string   // 売上が最も多いキャスト（CSV表示用）
+  tableCasts: string[]  // 卓バックの受取キャスト（卓の担当。複数なら頭割り）
+  completedAt: number   // Unix timestamp
 }
 
 // ── 手数料設定 ───────────────────────────────────

@@ -68,10 +68,13 @@ interface PosState {
   // 手数料設定
   feeSettings: FeeSettings
 
-  // バック率（0.30 = 30%）
+  // 卓バック率（会計合計に対する率。例 0.10 = 10%）
   backRate: number
 
-  // カテゴリ別バック率（例 { 'キャストドリンク': 0.5 }。未設定は backRate を使う）
+  // キャストドリンクのドリンクバック率（ドリンク料金に対する率。例 0.50 = 50%）
+  drinkBackRate: number
+
+  // （旧）カテゴリ別バック率。現行モデルでは未使用だが互換のため保持
   categoryRates: Record<string, number>
 
   // 消費税の扱い
@@ -99,13 +102,12 @@ interface PosState {
   // アクション
   addSeat: (name: string, solo: boolean) => void
   updateSeat: (id: string, patch: Partial<Seat>) => void
-  setSeatCast: (seatId: string, cast: string) => void
+  setTableCasts: (seatId: string, casts: string[]) => void
   setCurrentSeat: (id: string) => void
 
   addOrderItem: (seatId: string, item: Omit<OrderItem, 'id'>) => void
   changeQty: (seatId: string, itemId: string, delta: number) => void
   changeItemCast: (seatId: string, itemId: string, cast: string) => void
-  toggleItemFullBack: (seatId: string, itemId: string) => void
   clearOrder: (seatId: string) => void
 
   completePayment: (
@@ -121,7 +123,7 @@ interface PosState {
   saveFeeSettings: (settings: FeeSettings) => Promise<void>
   loadFeeSettings: () => Promise<void>
 
-  saveBackRate: (rate: number) => Promise<void>
+  saveBackRate: (rate: number, drinkRate: number) => Promise<void>
   loadBackRate: () => Promise<void>
 
   saveCategoryRates: (rates: Record<string, number>) => Promise<void>
@@ -156,7 +158,7 @@ export const usePosStore = create<PosState>((set, get) => {
     setDoc(doc(db, COLLECTIONS.TABLES, seatId), {
       name: seat.name,
       solo: seat.solo,
-      defaultCast: seat.defaultCast,
+      tableCasts: seat.tableCasts,
       items: orders[seatId] ?? [],
       createdAt: seat.createdAt,
       updatedAt: Date.now(),
@@ -171,9 +173,9 @@ export const usePosStore = create<PosState>((set, get) => {
   signingIn: false,
 
   seats: [
-    { id: 'A', name: '', solo: false, defaultCast: '', createdAt: Date.now() },
-    { id: 'B', name: '', solo: false, defaultCast: '', createdAt: Date.now() },
-    { id: 'C', name: '', solo: false, defaultCast: '', createdAt: Date.now() },
+    { id: 'A', name: '', solo: false, tableCasts: [], createdAt: Date.now() },
+    { id: 'B', name: '', solo: false, tableCasts: [], createdAt: Date.now() },
+    { id: 'C', name: '', solo: false, tableCasts: [], createdAt: Date.now() },
   ],
   currentSeatId: readSeat(),
   orders: { A: [], B: [], C: [] },
@@ -185,6 +187,7 @@ export const usePosStore = create<PosState>((set, get) => {
   transactionsLoading: true,
   feeSettings: { card: 3.25, qr: 1.98 },
   backRate: BACK_RATE,
+  drinkBackRate: 0,
   categoryRates: {},
   taxRate: DEFAULT_TAX_RATE,
   taxMode: 'exclusive',
@@ -275,7 +278,7 @@ export const usePosStore = create<PosState>((set, get) => {
   addSeat: (name, solo) => {
     const id = newSeatId()
     set((s) => ({
-      seats: [...s.seats, { id, name, solo, defaultCast: '', createdAt: Date.now() }],
+      seats: [...s.seats, { id, name, solo, tableCasts: [], createdAt: Date.now() }],
       orders: { ...s.orders, [id]: [] },
       currentSeatId: id,
     }))
@@ -290,14 +293,10 @@ export const usePosStore = create<PosState>((set, get) => {
     persistTable(id)
   },
 
-  // 席の担当キャストを変更し、その席の注文中の全商品にも担当を反映する
-  setSeatCast: (seatId, cast) => {
+  // 卓の担当キャスト（複数可）を設定する
+  setTableCasts: (seatId, casts) => {
     set((s) => ({
-      seats: s.seats.map((seat) => (seat.id === seatId ? { ...seat, defaultCast: cast } : seat)),
-      orders: {
-        ...s.orders,
-        [seatId]: (s.orders[seatId] ?? []).map((x) => ({ ...x, cast })),
-      },
+      seats: s.seats.map((seat) => (seat.id === seatId ? { ...seat, tableCasts: casts } : seat)),
     }))
     persistTable(seatId)
   },
@@ -354,18 +353,6 @@ export const usePosStore = create<PosState>((set, get) => {
     persistTable(seatId)
   },
 
-  toggleItemFullBack: (seatId, itemId) => {
-    set((s) => ({
-      orders: {
-        ...s.orders,
-        [seatId]: (s.orders[seatId] ?? []).map((x) =>
-          x.id === itemId ? { ...x, fullBack: !x.fullBack } : x
-        ),
-      },
-    }))
-    persistTable(seatId)
-  },
-
   clearOrder: (seatId) => {
     set((s) => ({ orders: { ...s.orders, [seatId]: [] } }))
     persistTable(seatId)
@@ -389,14 +376,17 @@ export const usePosStore = create<PosState>((set, get) => {
     const feeAmount = calcFee(total, feeRate)
     const netAmount = total - feeAmount
 
-    // 担当売上が最も多いキャストを主担当に
+    // 卓の担当キャスト（空を除く。卓バックの頭割り対象）
+    const tableCasts = seat.tableCasts.filter(Boolean)
+
+    // 担当売上が最も多いキャストを主担当に（CSV表示用）
     const castSales: Record<string, number> = {}
     items.forEach((x) => {
       if (x.cast) castSales[x.cast] = (castSales[x.cast] ?? 0) + x.priceExTax * x.qty
     })
     const primaryCast =
       Object.entries(castSales).sort(([, a], [, b]) => b - a)[0]?.[0] ??
-      seat.defaultCast ??
+      tableCasts[0] ??
       ''
 
     const tx: Omit<Transaction, 'id'> = {
@@ -411,6 +401,7 @@ export const usePosStore = create<PosState>((set, get) => {
       feeAmount,
       netAmount,
       primaryCast,
+      tableCasts,
       completedAt: Date.now(),
     }
 
@@ -433,7 +424,7 @@ export const usePosStore = create<PosState>((set, get) => {
         const now = Date.now()
         ;['A', 'B', 'C'].forEach((id, i) => {
           setDoc(doc(db, COLLECTIONS.TABLES, id), {
-            name: '', solo: false, defaultCast: '', items: [],
+            name: '', solo: false, tableCasts: [], items: [],
             createdAt: now + i, updatedAt: now,
           }).catch(() => {})
         })
@@ -442,12 +433,13 @@ export const usePosStore = create<PosState>((set, get) => {
       const seats: Seat[] = []
       const orders: Record<string, OrderItem[]> = {}
       snap.docs.forEach((d) => {
-        const data = d.data() as { name?: string; solo?: boolean; defaultCast?: string; items?: OrderItem[]; createdAt?: number }
+        const data = d.data() as { name?: string; solo?: boolean; tableCasts?: string[]; defaultCast?: string; items?: OrderItem[]; createdAt?: number }
         seats.push({
           id: d.id,
           name: data.name ?? '',
           solo: !!data.solo,
-          defaultCast: data.defaultCast ?? '',
+          // 旧データ（defaultCast）からの移行に対応
+          tableCasts: data.tableCasts ?? (data.defaultCast ? [data.defaultCast] : []),
           createdAt: data.createdAt ?? 0,
         })
         orders[d.id] = data.items ?? []
@@ -504,16 +496,20 @@ export const usePosStore = create<PosState>((set, get) => {
     }
   },
 
-  // ── バック率の永続化 ───────────────────────────
-  saveBackRate: async (rate) => {
-    set({ backRate: rate })
-    await setDoc(doc(db, COLLECTIONS.SETTINGS, 'back'), { rate })
+  // ── バック率の永続化（卓バック率＋ドリンクバック率） ──
+  saveBackRate: async (rate, drinkRate) => {
+    set({ backRate: rate, drinkBackRate: drinkRate })
+    await setDoc(doc(db, COLLECTIONS.SETTINGS, 'back'), { rate, drinkRate })
   },
 
   loadBackRate: async () => {
     const snap = await getDoc(doc(db, COLLECTIONS.SETTINGS, 'back'))
     if (snap.exists()) {
-      set({ backRate: (snap.data() as { rate: number }).rate })
+      const d = snap.data() as { rate?: number; drinkRate?: number }
+      set({
+        backRate: d.rate ?? BACK_RATE,
+        drinkBackRate: d.drinkRate ?? 0,
+      })
     }
   },
 
