@@ -156,6 +156,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .close-row.total { font-weight: 600; font-size: 13px; border-bottom: 0.5px solid #ccc; }
 .close-warn { font-size: 11px; color: #854f0b; background: #faeeda; border: 0.5px solid #e3c79a; border-radius: 6px; padding: 7px 9px; margin-bottom: 8px; }
 .close-done { font-size: 12px; color: #1a1a18; background: #f8f7f4; border: 0.5px solid #e0ddd5; border-radius: 6px; padding: 9px 10px; }
+
+/* ── 取引明細 ─────────────────────────────────── */
+.tx-list { display: flex; flex-direction: column; gap: 4px; max-height: 340px; overflow-y: auto; }
+.tx-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #fff; border: 0.5px solid #e0ddd5; border-radius: 6px; }
+.tx-row.closed { background: #f2efe9; }
+.tx-time { font-size: 11px; color: #888780; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tx-seat { flex: 1; min-width: 0; font-size: 12px; color: #1a1a18; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tx-total { font-size: 13px; font-weight: 500; color: #1a1a18; white-space: nowrap; }
+.tx-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.tx-btn { font-size: 10px; padding: 3px 9px; border-radius: 6px; border: 0.5px solid #ccc; background: #fff; color: #5f5e5a; cursor: pointer; font-family: inherit; }
+.tx-btn.edit { border-color: #378add; color: #185fa5; }
+.tx-btn.del { border-color: #d8a3a3; color: #a32d2d; }
+.tx-view-list { display: flex; flex-direction: column; gap: 2px; max-height: 200px; overflow-y: auto; margin-bottom: 6px; }
 .export-btn { padding: 3px 10px; border-radius: 16px; font-size: 11px; border: 0.5px solid #ccc; cursor: pointer; color: #1a1a18; background: #fff; font-family: inherit; display: flex; align-items: center; gap: 4px; }
 .sales-body { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
 .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }

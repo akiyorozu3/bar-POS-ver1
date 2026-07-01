@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { usePosStore, todayStr } from '@/store/posStore'
+import { usePosStore, todayStr, dateStrOf } from '@/store/posStore'
+import type { Transaction } from '@/types'
 import { useSalesSummary } from '@/hooks/useSalesSummary'
 import { buildTransactionCSV, buildCastCSV, downloadCSV } from '@/lib/csv'
 import { castLabel } from '@/lib/cast'
@@ -35,11 +36,13 @@ function periodRange(period: Period, entryDate: string): [Date, Date] {
 }
 
 export default function SalesScreen() {
-  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, saveBackRate, taxRate, taxMode, saveTaxSettings, seats, orders, closedDates, closeDay, reopenDay, entryDate, casts, payouts, subscribePayouts, addPayout, deletePayout } = usePosStore()
+  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, saveBackRate, taxRate, taxMode, saveTaxSettings, seats, orders, closedDates, closeDay, reopenDay, entryDate, casts, payouts, subscribePayouts, addPayout, deletePayout, deleteTransaction, restoreTransaction } = usePosStore()
   const [period, setPeriod] = useState<Period>('today')
   const [showFeePanel, setShowFeePanel] = useState(false)
   const [showSyncPanel, setShowSyncPanel] = useState(false)
   const [showClosePanel, setShowClosePanel] = useState(false)
+  const [showTxPanel, setShowTxPanel] = useState(false)
+  const [viewTx, setViewTx] = useState<Transaction | null>(null)
   const [showPayoutPanel, setShowPayoutPanel] = useState(false)
   const [payoutCast, setPayoutCast] = useState('')
   const [payoutAmount, setPayoutAmount] = useState('')
@@ -81,6 +84,20 @@ export default function SalesScreen() {
     if (!payoutCast || !Number.isFinite(amt) || amt === 0) return
     await addPayout(payoutCast, payoutType, amt)
     setPayoutAmount('')
+  }
+
+  // 完了した会計の編集/削除
+  const txClosed = (t: Transaction) => closedDates.includes(dateStrOf(t.completedAt))
+  const handleEditTx = (t: Transaction) => {
+    if (txClosed(t)) { alert(`${dateStrOf(t.completedAt)} は締め済みです。締め解除してから編集してください。`); return }
+    if (!confirm('この会計を編集します。\n内容を注文画面に戻し、元の会計は削除します（会計し直すと再計算されます）。\nよろしいですか？')) return
+    restoreTransaction(t)
+    document.dispatchEvent(new CustomEvent('pos:go-order'))
+  }
+  const handleDeleteTx = async (t: Transaction) => {
+    if (txClosed(t)) { alert(`${dateStrOf(t.completedAt)} は締め済みです。締め解除してから削除してください。`); return }
+    if (!confirm(`${t.seatName} の会計（¥${t.total.toLocaleString()}）を削除します。よろしいですか？`)) return
+    await deleteTransaction(t.id)
   }
 
   const handleClose = async () => {
@@ -160,6 +177,12 @@ export default function SalesScreen() {
           <i className="ti ti-cloud" aria-hidden /> 連携
         </button>
         <button
+          className={`top-action-btn ${showTxPanel ? 'active-s' : ''}`}
+          onClick={() => setShowTxPanel((v) => !v)}
+        >
+          <i className="ti ti-receipt" aria-hidden /> 取引明細
+        </button>
+        <button
           className={`top-action-btn ${showPayoutPanel ? 'active-s' : ''}`}
           onClick={() => { setPeriod('today'); setShowPayoutPanel((v) => !v) }}
         >
@@ -182,6 +205,33 @@ export default function SalesScreen() {
       </div>
 
       <div className="sales-body">
+        {/* 取引明細（完了した会計・オーナー） */}
+        {showTxPanel && (
+          <div className="fee-settings">
+            <div className="fee-settings-title">
+              <i className="ti ti-receipt" aria-hidden /> 取引明細（{transactions.length}件）
+            </div>
+            <div className="tx-list">
+              {transactions.length === 0 ? (
+                <div className="mm-empty" style={{ padding: 12 }}>この期間の会計はありません</div>
+              ) : transactions.map((t) => (
+                <div className={`tx-row ${txClosed(t) ? 'closed' : ''}`} key={t.id}>
+                  <span className="tx-time">{new Date(t.completedAt).toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="tx-seat">{t.seatName}</span>
+                  <span className={`method ${PAY_METHOD_CLS[t.payMethod]}`}>{PAY_LABEL[t.payMethod]}</span>
+                  <span className="tx-total">¥{t.total.toLocaleString()}</span>
+                  <span className="tx-actions">
+                    <button className="tx-btn" onClick={() => setViewTx(t)}>閲覧</button>
+                    <button className="tx-btn edit" onClick={() => handleEditTx(t)}>編集</button>
+                    <button className="tx-btn del" onClick={() => handleDeleteTx(t)}>削除</button>
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="mm-note" style={{ paddingTop: 6 }}>※ 締め済みの日の会計は、締め解除してから編集/削除できます。</div>
+          </div>
+        )}
+
         {/* 日払い/大入パネル */}
         {showPayoutPanel && (
           <div className="fee-settings">
@@ -431,6 +481,40 @@ export default function SalesScreen() {
           </div>
         </div>
       </div>
+
+      {viewTx && (
+        <div className="modal-overlay" onClick={() => setViewTx(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">
+              {viewTx.seatName}（{new Date(viewTx.completedAt).toLocaleString('ja-JP')}）
+            </div>
+            <div className="tx-view-list">
+              {viewTx.items.map((x) => (
+                <div key={x.id} className="co-row">
+                  <span className="co-row-name">{x.name} × {x.qty}</span>
+                  <span className="co-row-cast">{x.cast}</span>
+                  <span className={`co-row-price ${x.priceExTax < 0 ? 'minus' : ''}`}>¥{(x.priceExTax * x.qty).toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+            <div className="close-row"><span>小計</span><span>¥{viewTx.subtotal.toLocaleString()}</span></div>
+            {viewTx.tax > 0 && <div className="close-row"><span>消費税</span><span>¥{viewTx.tax.toLocaleString()}</span></div>}
+            <div className="close-row total"><span>合計（{PAY_LABEL[viewTx.payMethod]}）</span><span>¥{viewTx.total.toLocaleString()}</span></div>
+            {viewTx.feeAmount > 0 && (
+              <>
+                <div className="close-row"><span>決済手数料（{viewTx.feeRate}%）</span><span className="fee-amt">−¥{viewTx.feeAmount.toLocaleString()}</span></div>
+                <div className="close-row"><span>実入金額</span><span className="net-amt">¥{viewTx.netAmount.toLocaleString()}</span></div>
+              </>
+            )}
+            {viewTx.tableCasts?.length > 0 && (
+              <div className="close-row"><span>卓の担当</span><span>{viewTx.tableCasts.join('・')}</span></div>
+            )}
+            <div className="modal-btns" style={{ marginTop: 10 }}>
+              <button className="modal-btn ok" onClick={() => setViewTx(null)}>閉じる</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

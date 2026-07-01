@@ -129,6 +129,9 @@ interface PosState {
     cashReceived?: number
   ) => Promise<void>
 
+  deleteTransaction: (id: string) => Promise<void>
+  restoreTransaction: (tx: Transaction) => void
+
   subscribeMenus: () => () => void
   subscribeTables: () => () => void
   subscribeClosures: () => () => void
@@ -633,6 +636,26 @@ export const usePosStore = create<PosState>((set, get) => {
       set({ transactions, transactionsLoading: false })
     })
     return unsub
+  },
+
+  // ── 完了した会計の削除・編集（オーナー） ──────────
+  deleteTransaction: async (id) => {
+    await deleteDoc(doc(db, COLLECTIONS.TRANSACTIONS, id))
+  },
+
+  // 編集：元取引を削除し、内容を空き卓に復元。入力日も元の日に合わせる
+  restoreTransaction: (tx) => {
+    const id = newSeatId()
+    const items = tx.items.map((it) => ({ ...it, id: newItemId() }))
+    set((s) => ({
+      seats: [...s.seats, { id, name: tx.seatName ?? '', solo: !!tx.solo, tableCasts: tx.tableCasts ?? [], createdAt: Date.now() }],
+      orders: { ...s.orders, [id]: items },
+      currentSeatId: id,
+      entryDate: dateStrOf(tx.completedAt),
+    }))
+    persistSeatId(id)
+    persistTable(id)
+    deleteDoc(doc(db, COLLECTIONS.TRANSACTIONS, tx.id)).catch(() => {})
   },
 
   // ── 手数料設定の永続化 ─────────────────────────

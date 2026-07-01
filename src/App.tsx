@@ -62,9 +62,14 @@ export default function App() {
 
   // 会計へ遷移イベント（OrderScreen から発火）
   useEffect(() => {
-    const handler = () => setScreen('checkout')
-    document.addEventListener('pos:go-checkout', handler)
-    return () => document.removeEventListener('pos:go-checkout', handler)
+    const toCheckout = () => setScreen('checkout')
+    const toOrder = () => setScreen('order')
+    document.addEventListener('pos:go-checkout', toCheckout)
+    document.addEventListener('pos:go-order', toOrder)
+    return () => {
+      document.removeEventListener('pos:go-checkout', toCheckout)
+      document.removeEventListener('pos:go-order', toOrder)
+    }
   }, [])
 
   // 認証確認中
