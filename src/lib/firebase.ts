@@ -24,4 +24,5 @@ export const COLLECTIONS = {
   TABLES: 'tables',
   CLOSURES: 'closures',
   PUNCHES: 'punches',
+  PAYOUTS: 'payouts',
 } as const

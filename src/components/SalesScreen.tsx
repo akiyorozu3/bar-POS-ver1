@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { usePosStore, todayStr } from '@/store/posStore'
 import { useSalesSummary } from '@/hooks/useSalesSummary'
 import { buildTransactionCSV, buildCastCSV, downloadCSV } from '@/lib/csv'
+import { castLabel } from '@/lib/cast'
 import type { PayMethod } from '@/types'
 
 type Period = 'today' | 'week' | 'month'
@@ -34,11 +35,15 @@ function periodRange(period: Period, entryDate: string): [Date, Date] {
 }
 
 export default function SalesScreen() {
-  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, saveBackRate, taxRate, taxMode, saveTaxSettings, seats, orders, closedDates, closeDay, reopenDay, entryDate } = usePosStore()
+  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, saveBackRate, taxRate, taxMode, saveTaxSettings, seats, orders, closedDates, closeDay, reopenDay, entryDate, casts, payouts, subscribePayouts, addPayout, deletePayout } = usePosStore()
   const [period, setPeriod] = useState<Period>('today')
   const [showFeePanel, setShowFeePanel] = useState(false)
   const [showSyncPanel, setShowSyncPanel] = useState(false)
   const [showClosePanel, setShowClosePanel] = useState(false)
+  const [showPayoutPanel, setShowPayoutPanel] = useState(false)
+  const [payoutCast, setPayoutCast] = useState('')
+  const [payoutAmount, setPayoutAmount] = useState('')
+  const [payoutType, setPayoutType] = useState<'daily' | 'oiri'>('daily')
   const [closing, setClosing] = useState(false)
   const [cardFee, setCardFee] = useState(String(feeSettings.card))
   const [qrFee, setQrFee] = useState(String(feeSettings.qr))
@@ -51,9 +56,10 @@ export default function SalesScreen() {
   // 期間・入力日が変わるたびに購読し直す
   useEffect(() => {
     const [from, to] = periodRange(period, entryDate)
-    const unsub = subscribeTransactions(from, to)
-    return unsub
-  }, [period, entryDate, subscribeTransactions])
+    const u1 = subscribeTransactions(from, to)
+    const u2 = subscribePayouts(from, to)
+    return () => { u1(); u2() }
+  }, [period, entryDate, subscribeTransactions, subscribePayouts])
 
   const summary = useSalesSummary(transactions)
 
@@ -63,6 +69,19 @@ export default function SalesScreen() {
   const isBackdated = closeDate !== todayStr()
   const unpaidCount = seats.filter((s) => (orders[s.id]?.length ?? 0) > 0).length
   const totalBack = summary.castSummaries.reduce((a, c) => a + c.backAmount, 0)
+
+  // 日払い/大入（ヘッダー日付の分）
+  const dayPayouts = payouts.filter((p) => p.date === closeDate)
+  const dailyPayTotal = dayPayouts.filter((p) => p.type === 'daily').reduce((a, p) => a + p.amount, 0)
+  const oiriTotal = dayPayouts.filter((p) => p.type === 'oiri').reduce((a, p) => a + p.amount, 0)
+  const safeCash = summary.byMethod.cash.sales - dailyPayTotal - oiriTotal
+
+  const handleAddPayout = async () => {
+    const amt = Math.abs(parseInt(payoutAmount, 10))
+    if (!payoutCast || !Number.isFinite(amt) || amt === 0) return
+    await addPayout(payoutCast, payoutType, amt)
+    setPayoutAmount('')
+  }
 
   const handleClose = async () => {
     if (!confirm(`${closeDate} を締めますか？\n締め後はこの日の会計入力ができなくなります（締め解除で戻せます）。`)) return
@@ -77,6 +96,8 @@ export default function SalesScreen() {
         totalNet: summary.totalNet,
         totalBack,
         txCount: summary.txCount,
+        dailyPay: dailyPayTotal,
+        oiri: oiriTotal,
       })
     } catch (e) {
       alert('レジ締めに失敗しました。\n' + ((e as Error)?.message ?? e))
@@ -139,6 +160,12 @@ export default function SalesScreen() {
           <i className="ti ti-cloud" aria-hidden /> 連携
         </button>
         <button
+          className={`top-action-btn ${showPayoutPanel ? 'active-s' : ''}`}
+          onClick={() => { setPeriod('today'); setShowPayoutPanel((v) => !v) }}
+        >
+          <i className="ti ti-cash-banknote" aria-hidden /> 日払い/大入
+        </button>
+        <button
           className={`top-action-btn ${showClosePanel ? 'active-s' : ''} ${dateClosed ? 'closed' : ''}`}
           onClick={() => { setPeriod('today'); setShowClosePanel((v) => !v) }}
         >
@@ -155,6 +182,45 @@ export default function SalesScreen() {
       </div>
 
       <div className="sales-body">
+        {/* 日払い/大入パネル */}
+        {showPayoutPanel && (
+          <div className="fee-settings">
+            <div className="fee-settings-title">
+              <i className="ti ti-cash-banknote" aria-hidden /> 日払い/大入（{closeDate.replace(/-/g, '/')}）
+            </div>
+            <div className="mm-add-row" style={{ marginBottom: 8 }}>
+              <select className="mm-add-cat" value={payoutType} onChange={(e) => setPayoutType(e.target.value as 'daily' | 'oiri')}>
+                <option value="daily">日払い</option>
+                <option value="oiri">大入</option>
+              </select>
+              <select className="mm-add-name" value={payoutCast} onChange={(e) => setPayoutCast(e.target.value)}>
+                <option value="">キャスト</option>
+                {casts.map((c) => <option key={c.id} value={c.id}>{castLabel(c)}</option>)}
+              </select>
+              <input className="mm-add-price" type="number" min="0" placeholder="金額" value={payoutAmount} onChange={(e) => setPayoutAmount(e.target.value)} />
+              <button className="mm-add-btn" onClick={handleAddPayout} disabled={!payoutCast || !payoutAmount}>＋ 追加</button>
+            </div>
+            {dayPayouts.length === 0 ? (
+              <div className="mm-empty" style={{ padding: 12 }}>この日の日払い/大入はありません</div>
+            ) : dayPayouts.map((p) => (
+              <div className="close-row" key={p.id}>
+                <span>
+                  <span className={`method ${p.type === 'daily' ? 'method-card' : 'method-qr'}`}>{p.type === 'daily' ? '日払い' : '大入'}</span>
+                  {' '}{p.name || p.realName}
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  ¥{p.amount.toLocaleString()}
+                  <button className="mm-row-del" onClick={() => deletePayout(p.id)}>削除</button>
+                </span>
+              </div>
+            ))}
+            <div className="close-row total">
+              <span>日払い ¥{dailyPayTotal.toLocaleString()} ／ 大入 ¥{oiriTotal.toLocaleString()}</span>
+              <span className="fee-amt">−¥{(dailyPayTotal + oiriTotal).toLocaleString()}</span>
+            </div>
+          </div>
+        )}
+
         {/* レジ締めパネル */}
         {showClosePanel && (
           <div className="fee-settings">
@@ -180,6 +246,13 @@ export default function SalesScreen() {
                 <div className="close-row"><span>決済手数料</span><span className="fee-amt">−¥{summary.totalFee.toLocaleString()}</span></div>
                 <div className="close-row"><span>実際の入金合計</span><span className="net-amt">¥{summary.totalNet.toLocaleString()}</span></div>
                 <div className="close-row"><span>バック合計</span><span className="back-badge">¥{totalBack.toLocaleString()}</span></div>
+                {(dailyPayTotal > 0 || oiriTotal > 0) && (
+                  <>
+                    <div className="close-row"><span>日払い</span><span className="fee-amt">−¥{dailyPayTotal.toLocaleString()}</span></div>
+                    <div className="close-row"><span>大入</span><span className="fee-amt">−¥{oiriTotal.toLocaleString()}</span></div>
+                  </>
+                )}
+                <div className="close-row total"><span>金庫に残る現金（現金 − 日払い − 大入）</span><span>¥{safeCash.toLocaleString()}</span></div>
                 <button className="modal-btn ok" style={{ marginTop: 8, width: '100%' }} onClick={handleClose} disabled={closing}>
                   {closeDate.replace(/-/g, '/')} を締める
                 </button>

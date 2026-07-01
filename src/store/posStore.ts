@@ -32,7 +32,7 @@ import { db, auth, COLLECTIONS } from '@/lib/firebase'
 import { idToEmail, emailToRole } from '@/lib/authConfig'
 import { calcBill, calcFee, DEFAULT_TAX_RATE } from '@/lib/tax'
 import { DEFAULT_MENUS } from '@/lib/defaultMenus'
-import type { Seat, OrderItem, MenuItem, Cast, Transaction, FeeSettings, PayMethod, Role, TaxMode, TaxSettings, Closure, Punch } from '@/types'
+import type { Seat, OrderItem, MenuItem, Cast, Transaction, FeeSettings, PayMethod, Role, TaxMode, TaxSettings, Closure, Punch, Payout } from '@/types'
 
 // 初期投入用のデフォルトキャスト（実データは Firestore で管理）
 export const DEFAULT_CASTS = ['さくら', 'あおい', 'ひなた', 'れいな']
@@ -90,6 +90,9 @@ interface PosState {
   // 打刻（購読中の期間分）
   punches: Punch[]
 
+  // 日払い/大入（購読中の期間分）
+  payouts: Payout[]
+
   // 認証アクション
   initAuth: () => () => void
   signIn: (id: string, password: string) => Promise<void>
@@ -131,6 +134,10 @@ interface PosState {
   subscribeClosures: () => () => void
   closeDay: (snapshot: Omit<Closure, 'date' | 'closedAt'>) => Promise<void>
   reopenDay: (date: string) => Promise<void>
+
+  subscribePayouts: (from: Date, to: Date) => () => void
+  addPayout: (castId: string, type: 'daily' | 'oiri', amount: number) => Promise<void>
+  deletePayout: (id: string) => Promise<void>
 
   subscribePunches: (from: Date, to: Date) => () => void
   addPunch: (castId: string, type: 'in' | 'out') => Promise<void>
@@ -229,6 +236,7 @@ export const usePosStore = create<PosState>((set, get) => {
   entryDate: todayStr(),
   closedDates: [],
   punches: [],
+  payouts: [],
 
   // ── 認証 ─────────────────────────────────────
   initAuth: () => {
@@ -525,6 +533,40 @@ export const usePosStore = create<PosState>((set, get) => {
 
   reopenDay: async (date) => {
     await deleteDoc(doc(db, COLLECTIONS.CLOSURES, date))
+  },
+
+  // ── 日払い/大入 ───────────────────────────────
+  subscribePayouts: (from, to) => {
+    const fromStr = dateStrOf(from.getTime())
+    const toStr = dateStrOf(to.getTime())
+    const q = query(
+      collection(db, COLLECTIONS.PAYOUTS),
+      where('date', '>=', fromStr),
+      where('date', '<=', toStr),
+      orderBy('date', 'desc')
+    )
+    const unsub = onSnapshot(q, (snap) => {
+      set({ payouts: snap.docs.map((d) => ({ id: d.id, ...d.data() } as Payout)) })
+    }, () => { /* ルール未公開等は無視 */ })
+    return unsub
+  },
+
+  addPayout: async (castId, type, amount) => {
+    const cast = get().casts.find((c) => c.id === castId)
+    if (!cast) return
+    await addDoc(collection(db, COLLECTIONS.PAYOUTS), {
+      date: get().entryDate,
+      castId,
+      name: cast.name ?? '',
+      realName: cast.realName ?? '',
+      type,
+      amount,
+      at: Date.now(),
+    })
+  },
+
+  deletePayout: async (id) => {
+    await deleteDoc(doc(db, COLLECTIONS.PAYOUTS, id))
   },
 
   // ── 打刻 ──────────────────────────────────────

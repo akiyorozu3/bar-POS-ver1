@@ -87,6 +87,18 @@ export interface FeeSettings {
   qr: number     // %
 }
 
+// ── 日払い/大入 ──────────────────────────────────
+export interface Payout {
+  id: string
+  date: string             // YYYY-MM-DD（対象日）
+  castId: string
+  name: string             // 記録時のニックネーム
+  realName?: string        // 記録時の本名
+  type: 'daily' | 'oiri'   // 日払い / 大入
+  amount: number
+  at: number               // 記録時刻
+}
+
 // ── レジ締め（日次） ─────────────────────────────
 export interface Closure {
   date: string       // YYYY-MM-DD（ドキュメントID）
@@ -99,6 +111,8 @@ export interface Closure {
   totalNet: number   // 実入金合計
   totalBack: number  // バック合計
   txCount: number    // 取引件数
+  dailyPay?: number  // 日払い合計
+  oiri?: number      // 大入合計
 }
 
 // ── キャスト集計 ─────────────────────────────────

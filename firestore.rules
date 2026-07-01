@@ -42,6 +42,11 @@ service cloud.firestore {
       allow update, delete: if isOwner();
     }
 
+    // 日払い/大入：オーナーのみ（金庫・売上管理に関わる）
+    match /payouts/{id} {
+      allow read, write: if isOwner();
+    }
+
     // 手数料設定：ログイン済みは閲覧可（会計計算に必要） / 変更はオーナーのみ
     match /settings/{id} {
       allow read: if isAuthed();
