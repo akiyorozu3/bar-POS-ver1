@@ -11,8 +11,8 @@ import LoginScreen from '@/components/LoginScreen'
 
 type Screen = 'order' | 'checkout' | 'sales' | 'menu' | 'cast' | 'punchmgr'
 
-// 打刻をスタッフにも開放するときは true に（当面はオーナーのみ）
-const PUNCH_STAFF_ENABLED = false
+// 打刻をスタッフにも開放（打刻管理タブはオーナーのみのまま）
+const PUNCH_STAFF_ENABLED = true
 
 const readScreen = (): Screen => {
   try { return (localStorage.getItem('pos:screen') as Screen) || 'order' } catch { return 'order' }
