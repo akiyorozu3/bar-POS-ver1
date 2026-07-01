@@ -7,6 +7,8 @@ export interface Shift {
   realName?: string
   inAt: number
   outAt: number | null   // null = 未退勤
+  inId: string           // 出勤打刻のID
+  outId: string | null   // 退勤打刻のID（未退勤は null）
   date: string           // 出勤日（YYYY-MM-DD）
 }
 
@@ -24,7 +26,7 @@ export function buildShifts(punches: Punch[]): { shifts: Shift[]; strayOuts: Pun
     const sorted = [...list].sort((a, b) => a.at - b.at)
     let openIn: Punch | null = null
     const pushShift = (i: Punch, o: Punch | null) =>
-      shifts.push({ castId: i.castId, name: i.name, realName: i.realName, inAt: i.at, outAt: o ? o.at : null, date: dateStrOf(i.at) })
+      shifts.push({ castId: i.castId, name: i.name, realName: i.realName, inAt: i.at, outAt: o ? o.at : null, inId: i.id, outId: o ? o.id : null, date: dateStrOf(i.at) })
     for (const p of sorted) {
       if (p.type === 'in') {
         if (openIn) pushShift(openIn, null) // 前の出勤が退勤なし → 未退勤シフト

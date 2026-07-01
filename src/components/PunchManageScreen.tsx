@@ -10,6 +10,7 @@ export default function PunchManageScreen() {
   const [from, setFrom] = useState(todayStr())
   const [to, setTo] = useState(todayStr())
   const [showEdit, setShowEdit] = useState(false)
+  const [problemOnly, setProblemOnly] = useState(false)
 
   // 日またぎ対応のため前後12時間バッファを付けて購読
   useEffect(() => {
@@ -24,6 +25,21 @@ export default function PunchManageScreen() {
   const shownShifts = shifts.filter((s) => inRange(s.date))
   const shownStray = strayOuts.filter((p) => inRange(p.date))
   const rawInRange = punches.filter((p) => inRange(p.date)).sort((a, b) => b.at - a.at)
+
+  // 不整合（未退勤 = 出勤のまま / 退勤のみ = 出勤なし退勤）
+  const openShifts = shownShifts.filter((s) => s.outAt == null)
+  const problemIds = new Set<string>([...openShifts.map((s) => s.inId), ...shownStray.map((p) => p.id)])
+  const probMap = new Map<string, { name: string; open: number; stray: number }>()
+  for (const s of openShifts) {
+    const e = probMap.get(s.castId) ?? { name: castLabel(s), open: 0, stray: 0 }
+    e.open++; probMap.set(s.castId, e)
+  }
+  for (const p of shownStray) {
+    const e = probMap.get(p.castId) ?? { name: castLabel(p), open: 0, stray: 0 }
+    e.stray++; probMap.set(p.castId, e)
+  }
+  const problems = [...probMap.values()]
+  const rawShown = problemOnly ? rawInRange.filter((p) => problemIds.has(p.id)) : rawInRange
 
   const handleCsv = () => {
     downloadCSV(buildShiftCSV(shownShifts), `勤務_${from}_${to}.csv`.replace(/-/g, ''))
@@ -62,9 +78,16 @@ export default function PunchManageScreen() {
               </div>
             ))}
           </div>
-          {shownStray.length > 0 && (
+          {problems.length > 0 && (
             <div className="close-warn" style={{ marginTop: 8 }}>
-              ⚠ 出勤の打刻が無い退勤が {shownStray.length} 件あります（下の「打刻の修正」で直せます）。
+              <div style={{ marginBottom: 4 }}>⚠ 要修正のキャスト（下の「打刻の修正」で直せます）:</div>
+              {problems.map((p, i) => (
+                <div key={i}>
+                  ・<b>{p.name}</b>
+                  {p.open > 0 && <span> 未退勤×{p.open}</span>}
+                  {p.stray > 0 && <span> 退勤のみ×{p.stray}</span>}
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -77,10 +100,18 @@ export default function PunchManageScreen() {
           {showEdit && (
             <div className="punch-edit-wrap">
               <PunchAddRow />
-              <div className="punch-edit-title">打刻一覧（{rawInRange.length}件・新しい順）</div>
-              {rawInRange.length === 0
-                ? <div className="punch-empty2">この期間の打刻はありません</div>
-                : rawInRange.map((p) => <PunchEditRow key={p.id} punch={p} />)}
+              <div className="punch-edit-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>打刻一覧（{rawShown.length}件・新しい順）</span>
+                {problemIds.size > 0 && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#854f0b' }}>
+                    <input type="checkbox" checked={problemOnly} onChange={(e) => setProblemOnly(e.target.checked)} />
+                    要修正のみ表示
+                  </label>
+                )}
+              </div>
+              {rawShown.length === 0
+                ? <div className="punch-empty2">{problemOnly ? '要修正の打刻はありません' : 'この期間の打刻はありません'}</div>
+                : rawShown.map((p) => <PunchEditRow key={p.id} punch={p} problem={problemIds.has(p.id)} />)}
             </div>
           )}
         </div>
@@ -123,7 +154,7 @@ function PunchAddRow() {
 }
 
 // ── 打刻の1行（編集・削除） ───────────────────────
-function PunchEditRow({ punch }: { punch: Punch }) {
+function PunchEditRow({ punch, problem }: { punch: Punch; problem?: boolean }) {
   const { updatePunch, deletePunch } = usePosStore()
   const [dt, setDt] = useState(toDatetimeLocal(punch.at))
   const [type, setType] = useState<'in' | 'out'>(punch.type)
@@ -145,8 +176,11 @@ function PunchEditRow({ punch }: { punch: Punch }) {
   }
 
   return (
-    <div className="punch-edit-row">
-      <span className="punch-edit-name">{castLabel({ name: punch.name, realName: punch.realName })}</span>
+    <div className={`punch-edit-row ${problem ? 'problem' : ''}`}>
+      <span className="punch-edit-name">
+        {problem && <span className="punch-warn-badge">⚠</span>}
+        {castLabel({ name: punch.name, realName: punch.realName })}
+      </span>
       <input className="punch-dt" type="datetime-local" value={dt} onChange={(e) => setDt(e.target.value)} />
       <select className="cast-sel" value={type} onChange={(e) => setType(e.target.value as 'in' | 'out')}>
         <option value="in">出勤</option>
