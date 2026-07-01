@@ -5,9 +5,13 @@ import CheckoutScreen from '@/components/CheckoutScreen'
 import SalesScreen from '@/components/SalesScreen'
 import MenuManageScreen from '@/components/MenuManageScreen'
 import CastManageScreen from '@/components/CastManageScreen'
+import PunchModal from '@/components/PunchModal'
 import LoginScreen from '@/components/LoginScreen'
 
 type Screen = 'order' | 'checkout' | 'sales' | 'menu' | 'cast'
+
+// 打刻をスタッフにも開放するときは true に（当面はオーナーのみ）
+const PUNCH_STAFF_ENABLED = false
 
 const readScreen = (): Screen => {
   try { return (localStorage.getItem('pos:screen') as Screen) || 'order' } catch { return 'order' }
@@ -15,6 +19,7 @@ const readScreen = (): Screen => {
 
 export default function App() {
   const [screen, setScreenRaw] = useState<Screen>(readScreen)
+  const [showPunch, setShowPunch] = useState(false)
   const setScreen = (s: Screen) => {
     setScreenRaw(s)
     try { localStorage.setItem('pos:screen', s) } catch { /* ignore */ }
@@ -86,10 +91,17 @@ export default function App() {
             <button className="topbar-date-today" onClick={() => setEntryDate(todayStr())}>今日に戻す</button>
           )}
         </label>
+        {(isOwner || PUNCH_STAFF_ENABLED) && (
+          <button className="punch-open-btn" onClick={() => setShowPunch(true)}>
+            <i className="ti ti-clock" aria-hidden /> 打刻
+          </button>
+        )}
         <button className="logout-btn" onClick={signOutUser}>
           <i className="ti ti-logout" aria-hidden /> ログアウト
         </button>
       </div>
+
+      {showPunch && <PunchModal onClose={() => setShowPunch(false)} />}
 
       {/* ナビゲーション */}
       <nav className="nav">

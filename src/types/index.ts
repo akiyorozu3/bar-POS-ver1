@@ -27,6 +27,18 @@ export interface Cast {
   sortOrder: number
 }
 
+// ── 打刻 ─────────────────────────────────────────
+export interface Punch {
+  id: string
+  castId: string
+  name: string        // 打刻時のニックネーム
+  realName?: string   // 打刻時の本名
+  type: 'in' | 'out'  // 出勤 / 退勤
+  at: number          // 打刻時刻（Unixミリ秒）
+  date: string        // YYYY-MM-DD
+  by?: string         // 打刻した権限（owner/staff）
+}
+
 // ── メニュー ─────────────────────────────────────
 export interface MenuItem {
   id: string

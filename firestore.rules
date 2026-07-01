@@ -36,6 +36,12 @@ service cloud.firestore {
       allow write: if isOwner();
     }
 
+    // 打刻：ログイン済みは閲覧・作成可（将来スタッフにも開放できるように） / 修正・削除はオーナーのみ
+    match /punches/{id} {
+      allow read, create: if isAuthed();
+      allow update, delete: if isOwner();
+    }
+
     // 手数料設定：ログイン済みは閲覧可（会計計算に必要） / 変更はオーナーのみ
     match /settings/{id} {
       allow read: if isAuthed();

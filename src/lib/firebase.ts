@@ -23,4 +23,5 @@ export const COLLECTIONS = {
   SETTINGS: 'settings',
   TABLES: 'tables',
   CLOSURES: 'closures',
+  PUNCHES: 'punches',
 } as const

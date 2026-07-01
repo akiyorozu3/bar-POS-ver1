@@ -253,6 +253,26 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .topbar.backdated .topbar-date input { background: #fff; color: #1a1a18; border-color: #ffce85; }
 .topbar-date-today { font-size: 10px; padding: 2px 8px; border-radius: 10px; border: none; background: #fff; color: #854f0b; cursor: pointer; font-family: inherit; font-weight: 500; white-space: nowrap; }
 .logout-btn { font-size: 11px; padding: 3px 10px; border-radius: 14px; border: 0.5px solid #555; background: transparent; color: #ddd; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.punch-open-btn { font-size: 11px; padding: 3px 12px; border-radius: 14px; border: none; background: #378add; color: #fff; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 4px; flex-shrink: 0; font-weight: 500; }
+
+/* ── 打刻モーダル ─────────────────────────────── */
+.punch-modal { width: 360px; }
+.punch-cast-sel { width: 100%; padding: 9px 10px; border-radius: 8px; border: 0.5px solid #ccc; background: #f8f7f4; color: #1a1a18; font-size: 14px; font-family: inherit; outline: none; margin-bottom: 10px; }
+.punch-btns { display: flex; gap: 8px; }
+.punch-btn { flex: 1; padding: 14px; border-radius: 10px; border: none; font-size: 15px; font-weight: 600; color: #fff; cursor: pointer; font-family: inherit; }
+.punch-btn.in { background: #1D9E75; }
+.punch-btn.out { background: #BA7517; }
+.punch-btn:disabled { background: #ccc; cursor: not-allowed; }
+.punch-flash { margin-top: 8px; font-size: 11px; color: #3b6d11; background: #eaf3de; border-radius: 6px; padding: 6px 9px; }
+.punch-list-title { font-size: 11px; color: #888780; margin: 12px 0 5px; }
+.punch-list { display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }
+.punch-empty { font-size: 11px; color: #888780; text-align: center; padding: 12px; }
+.punch-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #f8f7f4; border-radius: 6px; border: 0.5px solid #e0ddd5; }
+.punch-type { font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
+.punch-type.in { background: #d9f0e6; color: #1D9E75; }
+.punch-type.out { background: #faeeda; color: #854f0b; }
+.punch-name { flex: 1; font-size: 12px; color: #1a1a18; }
+.punch-time { font-size: 13px; color: #5f5e5a; font-variant-numeric: tabular-nums; }
 
 /* ── メニュー管理画面 ────────────────────────── */
 .menu-manage { display: flex; flex-direction: column; flex: 1; overflow: hidden; }

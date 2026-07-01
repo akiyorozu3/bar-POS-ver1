@@ -32,7 +32,7 @@ import { db, auth, COLLECTIONS } from '@/lib/firebase'
 import { idToEmail, emailToRole } from '@/lib/authConfig'
 import { calcBill, calcFee, DEFAULT_TAX_RATE } from '@/lib/tax'
 import { DEFAULT_MENUS } from '@/lib/defaultMenus'
-import type { Seat, OrderItem, MenuItem, Cast, Transaction, FeeSettings, PayMethod, Role, TaxMode, TaxSettings, Closure } from '@/types'
+import type { Seat, OrderItem, MenuItem, Cast, Transaction, FeeSettings, PayMethod, Role, TaxMode, TaxSettings, Closure, Punch } from '@/types'
 
 // 初期投入用のデフォルトキャスト（実データは Firestore で管理）
 export const DEFAULT_CASTS = ['さくら', 'あおい', 'ひなた', 'れいな']
@@ -87,6 +87,9 @@ interface PosState {
   // レジ締め済みの日付（YYYY-MM-DD）の一覧
   closedDates: string[]
 
+  // 打刻（購読中の期間分）
+  punches: Punch[]
+
   // 認証アクション
   initAuth: () => () => void
   signIn: (id: string, password: string) => Promise<void>
@@ -128,6 +131,9 @@ interface PosState {
   subscribeClosures: () => () => void
   closeDay: (snapshot: Omit<Closure, 'date' | 'closedAt'>) => Promise<void>
   reopenDay: (date: string) => Promise<void>
+
+  subscribePunches: (from: Date, to: Date) => () => void
+  addPunch: (castId: string, type: 'in' | 'out') => Promise<void>
   subscribeTransactions: (from: Date, to: Date) => () => void
 
   saveFeeSettings: (settings: FeeSettings) => Promise<void>
@@ -218,6 +224,7 @@ export const usePosStore = create<PosState>((set, get) => {
   taxMode: 'exclusive',
   entryDate: todayStr(),
   closedDates: [],
+  punches: [],
 
   // ── 認証 ─────────────────────────────────────
   initAuth: () => {
@@ -514,6 +521,34 @@ export const usePosStore = create<PosState>((set, get) => {
 
   reopenDay: async (date) => {
     await deleteDoc(doc(db, COLLECTIONS.CLOSURES, date))
+  },
+
+  // ── 打刻 ──────────────────────────────────────
+  subscribePunches: (from, to) => {
+    const q = query(
+      collection(db, COLLECTIONS.PUNCHES),
+      where('at', '>=', from.getTime()),
+      where('at', '<=', to.getTime()),
+      orderBy('at', 'desc')
+    )
+    const unsub = onSnapshot(q, (snap) => {
+      set({ punches: snap.docs.map((d) => ({ id: d.id, ...d.data() } as Punch)) })
+    }, () => { /* ルール未公開等は無視 */ })
+    return unsub
+  },
+
+  addPunch: async (castId, type) => {
+    const cast = get().casts.find((c) => c.id === castId)
+    if (!cast) return
+    await addDoc(collection(db, COLLECTIONS.PUNCHES), {
+      castId,
+      name: cast.name ?? '',
+      realName: cast.realName ?? '',
+      type,
+      at: Date.now(),
+      date: todayStr(),
+      by: get().role ?? '',
+    })
   },
 
   subscribeMenus: () => {
