@@ -126,6 +126,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .fee-badge { font-size: 9px; opacity: .7; }
 .cash-input-wrap { display: flex; flex-direction: column; gap: 4px; }
 .cash-lbl { font-size: 11px; color: #5f5e5a; }
+.cash-free-input { width: 100%; padding: 8px 10px; border: 0.5px solid #ccc; border-radius: 8px; background: #fff; color: #1a1a18; font-size: 16px; font-family: inherit; outline: none; text-align: right; }
+.cash-free-input:focus { border-color: #378add; }
 .cash-presets { display: flex; flex-wrap: wrap; gap: 3px; }
 .cash-preset { padding: 4px 8px; border-radius: 6px; border: 0.5px solid #e0ddd5; background: #fff; font-size: 11px; color: #5f5e5a; cursor: pointer; font-family: inherit; }
 .cash-preset.selected { border-color: #378add; background: #e6f1fb; color: #185fa5; }

@@ -158,6 +158,18 @@ export default function CheckoutScreen({ onBack }: Props) {
           {payMethod === 'cash' && (
             <div className="cash-input-wrap">
               <div className="cash-lbl">お預かり金額</div>
+              <input
+                className="cash-free-input"
+                type="number"
+                inputMode="numeric"
+                min="0"
+                placeholder="金額を入力"
+                value={cashReceived ?? ''}
+                onChange={(e) => {
+                  const n = parseInt(e.target.value, 10)
+                  setCashReceived(e.target.value === '' || Number.isNaN(n) ? null : n)
+                }}
+              />
               <div className="cash-presets">
                 {presets.slice(0, 5).map((v) => (
                   <button
