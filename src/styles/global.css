@@ -274,6 +274,24 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .punch-name { flex: 1; font-size: 12px; color: #1a1a18; }
 .punch-time { font-size: 13px; color: #5f5e5a; font-variant-numeric: tabular-nums; }
 
+/* ── 打刻管理 ─────────────────────────────────── */
+.punch-range { font-size: 11px; color: #5f5e5a; display: flex; align-items: center; gap: 4px; }
+.punch-range input { font-size: 12px; padding: 2px 6px; border: 0.5px solid #ccc; border-radius: 6px; background: #fff; color: #1a1a18; font-family: inherit; }
+.punch-table { background: #f8f7f4; border: 0.5px solid #e0ddd5; border-radius: 8px; overflow: hidden; }
+.punch-head, .punch-body-row { display: grid; grid-template-columns: 92px 1fr 62px 92px 96px; padding: 7px 10px; align-items: center; }
+.punch-head { background: #fff; border-bottom: 0.5px solid #e0ddd5; }
+.punch-head span { font-size: 10px; color: #888780; text-transform: uppercase; letter-spacing: .04em; }
+.punch-body-row { border-bottom: 0.5px solid #e0ddd5; }
+.punch-body-row span { font-size: 12px; color: #1a1a18; }
+.punch-body-row.warn { background: #faeeda; }
+.punch-empty2 { font-size: 11px; color: #888780; text-align: center; padding: 16px; }
+.punch-edit-wrap { margin-top: 8px; background: #f8f7f4; border: 0.5px solid #e0ddd5; border-radius: 8px; padding: 8px 10px; }
+.punch-edit-title { font-size: 10px; color: #888780; margin: 8px 0 4px; }
+.punch-edit-row { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
+.punch-edit-row.add { padding-bottom: 8px; border-bottom: 0.5px solid #e0ddd5; margin-bottom: 4px; }
+.punch-edit-name { flex: 1; min-width: 0; font-size: 12px; color: #1a1a18; }
+.punch-dt { font-size: 11px; padding: 4px 6px; border: 0.5px solid #ccc; border-radius: 6px; background: #fff; color: #1a1a18; font-family: inherit; }
+
 /* ── メニュー管理画面 ────────────────────────── */
 .menu-manage { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
 .mm-top { padding: 9px 14px; border-bottom: 0.5px solid #e0ddd5; background: #f8f7f4; display: flex; align-items: center; justify-content: space-between; }

@@ -51,6 +51,24 @@ export function buildCastCSV(summary: SalesSummary): string {
   return buildCSV([headers, ...rows])
 }
 
+/** 勤務（打刻ペア）CSVを生成 */
+export function buildShiftCSV(
+  shifts: { name: string; realName?: string; date: string; inAt: number; outAt: number | null }[]
+): string {
+  const headers = ['日付', '本名', 'ニックネーム', '出勤', '退勤', '勤務時間(分)']
+  const hm = (at: number) =>
+    new Date(at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+  const rows = shifts.map((s) => [
+    s.date,
+    s.realName || s.name,
+    s.name || '',
+    hm(s.inAt),
+    s.outAt == null ? '未退勤' : hm(s.outAt),
+    s.outAt == null ? '' : Math.max(0, Math.round((s.outAt - s.inAt) / 60000)),
+  ])
+  return buildCSV([headers, ...rows])
+}
+
 function buildCSV(data: (string | number)[][]): string {
   const BOM = '\uFEFF'
   const csv = data

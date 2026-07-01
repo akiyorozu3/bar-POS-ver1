@@ -134,6 +134,9 @@ interface PosState {
 
   subscribePunches: (from: Date, to: Date) => () => void
   addPunch: (castId: string, type: 'in' | 'out') => Promise<void>
+  addPunchAt: (castId: string, type: 'in' | 'out', at: number) => Promise<void>
+  updatePunch: (id: string, at: number, type: 'in' | 'out') => Promise<void>
+  deletePunch: (id: string) => Promise<void>
   subscribeTransactions: (from: Date, to: Date) => () => void
 
   saveFeeSettings: (settings: FeeSettings) => Promise<void>
@@ -154,10 +157,11 @@ const newSeatId = () => `seat-${++seatCounter}-${Date.now()}`
 const newItemId = () => `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 
 // YYYY-MM-DD（ローカル日付）
-export const todayStr = () => {
-  const d = new Date()
+export const dateStrOf = (ts: number) => {
+  const d = new Date(ts)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
+export const todayStr = () => dateStrOf(Date.now())
 // 入力日（entryDate, YYYY-MM-DD）から会計時刻を作る。今日ならそのまま現在時刻、過去日ならその日付＋現在時刻
 const entryDateToTs = (entryDate: string): number => {
   if (entryDate === todayStr()) return Date.now()
@@ -538,6 +542,10 @@ export const usePosStore = create<PosState>((set, get) => {
   },
 
   addPunch: async (castId, type) => {
+    await get().addPunchAt(castId, type, Date.now())
+  },
+
+  addPunchAt: async (castId, type, at) => {
     const cast = get().casts.find((c) => c.id === castId)
     if (!cast) return
     await addDoc(collection(db, COLLECTIONS.PUNCHES), {
@@ -545,10 +553,18 @@ export const usePosStore = create<PosState>((set, get) => {
       name: cast.name ?? '',
       realName: cast.realName ?? '',
       type,
-      at: Date.now(),
-      date: todayStr(),
+      at,
+      date: dateStrOf(at),
       by: get().role ?? '',
     })
+  },
+
+  updatePunch: async (id, at, type) => {
+    await updateDoc(doc(db, COLLECTIONS.PUNCHES, id), { at, type, date: dateStrOf(at) })
+  },
+
+  deletePunch: async (id) => {
+    await deleteDoc(doc(db, COLLECTIONS.PUNCHES, id))
   },
 
   subscribeMenus: () => {

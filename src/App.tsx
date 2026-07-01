@@ -6,9 +6,10 @@ import SalesScreen from '@/components/SalesScreen'
 import MenuManageScreen from '@/components/MenuManageScreen'
 import CastManageScreen from '@/components/CastManageScreen'
 import PunchModal from '@/components/PunchModal'
+import PunchManageScreen from '@/components/PunchManageScreen'
 import LoginScreen from '@/components/LoginScreen'
 
-type Screen = 'order' | 'checkout' | 'sales' | 'menu' | 'cast'
+type Screen = 'order' | 'checkout' | 'sales' | 'menu' | 'cast' | 'punchmgr'
 
 // 打刻をスタッフにも開放するときは true に（当面はオーナーのみ）
 const PUNCH_STAFF_ENABLED = false
@@ -56,7 +57,7 @@ export default function App() {
 
   // 権限が変わったら、許可されない画面からは注文入力に戻す
   useEffect(() => {
-    if (!isOwner && (screen === 'sales' || screen === 'menu' || screen === 'cast')) setScreen('order')
+    if (!isOwner && (screen === 'sales' || screen === 'menu' || screen === 'cast' || screen === 'punchmgr')) setScreen('order')
   }, [isOwner, screen])
 
   // 会計へ遷移イベント（OrderScreen から発火）
@@ -141,6 +142,14 @@ export default function App() {
             <i className="ti ti-users" aria-hidden /> キャスト管理
           </button>
         )}
+        {isOwner && (
+          <button
+            className={`nav-btn ${screen === 'punchmgr' ? 'active' : ''}`}
+            onClick={() => setScreen('punchmgr')}
+          >
+            <i className="ti ti-clock" aria-hidden /> 打刻管理
+          </button>
+        )}
       </nav>
 
       {/* 画面 */}
@@ -152,6 +161,7 @@ export default function App() {
         {screen === 'sales' && isOwner && <SalesScreen />}
         {screen === 'menu' && isOwner && <MenuManageScreen />}
         {screen === 'cast' && isOwner && <CastManageScreen />}
+        {screen === 'punchmgr' && isOwner && <PunchManageScreen />}
       </main>
     </div>
   )
