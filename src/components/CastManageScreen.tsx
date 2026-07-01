@@ -6,14 +6,19 @@ export default function CastManageScreen() {
   const { casts, castsLoading, addCast, seedDefaultCasts } = usePosStore()
 
   const [name, setName] = useState('')
+  const [realName, setRealName] = useState('')
   const [busy, setBusy] = useState(false)
 
+  // ニックネーム・本名のどちらか一方が入っていればOK
+  const canAdd = name.trim().length > 0 || realName.trim().length > 0
+
   const handleAdd = async () => {
-    if (!name.trim()) return
+    if (!canAdd) return
     setBusy(true)
     try {
-      await addCast(name.trim())
+      await addCast(name.trim(), realName.trim())
       setName('')
+      setRealName('')
     } finally {
       setBusy(false)
     }
@@ -38,16 +43,23 @@ export default function CastManageScreen() {
       <div className="mm-body">
         {/* 追加フォーム */}
         <div className="mm-add">
-          <div className="mm-add-title">キャストを追加</div>
+          <div className="mm-add-title">キャストを追加（ニックネームか本名のどちらかは必須）</div>
           <div className="mm-add-row">
             <input
               className="mm-add-name"
-              placeholder="キャスト名（例：さくら）"
+              placeholder="ニックネーム（源氏名）"
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleAdd() }}
             />
-            <button className="mm-add-btn" onClick={handleAdd} disabled={busy}>＋ 追加</button>
+            <input
+              className="mm-add-name"
+              placeholder="本名"
+              value={realName}
+              onChange={(e) => setRealName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleAdd() }}
+            />
+            <button className="mm-add-btn" onClick={handleAdd} disabled={!canAdd || busy}>＋ 追加</button>
           </div>
         </div>
 
@@ -76,23 +88,24 @@ export default function CastManageScreen() {
 function CastRow({ cast }: { cast: Cast }) {
   const { updateCast, deleteCast } = usePosStore()
   const [name, setName] = useState(cast.name)
+  const [realName, setRealName] = useState(cast.realName ?? '')
   const [busy, setBusy] = useState(false)
 
-  const dirty = name.trim() !== cast.name
-  const valid = name.trim().length > 0
+  const dirty = name.trim() !== cast.name || realName.trim() !== (cast.realName ?? '')
+  const valid = name.trim().length > 0 || realName.trim().length > 0
 
   const handleSave = async () => {
     if (!dirty || !valid) return
     setBusy(true)
     try {
-      await updateCast(cast.id, name.trim())
+      await updateCast(cast.id, { name: name.trim(), realName: realName.trim() })
     } finally {
       setBusy(false)
     }
   }
 
   const handleDelete = async () => {
-    if (!confirm(`「${cast.name}」を削除しますか？`)) return
+    if (!confirm(`「${cast.name || cast.realName}」を削除しますか？`)) return
     setBusy(true)
     try {
       await deleteCast(cast.id)
@@ -103,7 +116,8 @@ function CastRow({ cast }: { cast: Cast }) {
 
   return (
     <div className="mm-row">
-      <input className="mm-row-name" value={name} onChange={(e) => setName(e.target.value)} />
+      <input className="mm-row-name" placeholder="ニックネーム" value={name} onChange={(e) => setName(e.target.value)} />
+      <input className="mm-row-name" placeholder="本名" value={realName} onChange={(e) => setRealName(e.target.value)} />
       <button className="mm-row-save" onClick={handleSave} disabled={!dirty || !valid || busy}>保存</button>
       <button className="mm-row-del" onClick={handleDelete} disabled={busy}>削除</button>
     </div>

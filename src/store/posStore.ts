@@ -100,8 +100,8 @@ interface PosState {
 
   // キャスト管理（オーナーのみ）
   subscribeCasts: () => () => void
-  addCast: (name: string) => Promise<void>
-  updateCast: (id: string, name: string) => Promise<void>
+  addCast: (nickname: string, realName: string) => Promise<void>
+  updateCast: (id: string, patch: { name?: string; realName?: string }) => Promise<void>
   deleteCast: (id: string) => Promise<void>
   seedDefaultCasts: () => Promise<void>
 
@@ -280,13 +280,17 @@ export const usePosStore = create<PosState>((set, get) => {
     return unsub
   },
 
-  addCast: async (name) => {
+  addCast: async (nickname, realName) => {
     const sortOrder = get().casts.reduce((max, c) => Math.max(max, c.sortOrder), 0) + 1
-    await addDoc(collection(db, COLLECTIONS.CASTS), { name, sortOrder })
+    await addDoc(collection(db, COLLECTIONS.CASTS), {
+      name: nickname.trim(),
+      realName: realName.trim(),
+      sortOrder,
+    })
   },
 
-  updateCast: async (id, name) => {
-    await updateDoc(doc(db, COLLECTIONS.CASTS, id), { name })
+  updateCast: async (id, patch) => {
+    await updateDoc(doc(db, COLLECTIONS.CASTS, id), patch)
   },
 
   deleteCast: async (id) => {

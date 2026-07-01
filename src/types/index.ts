@@ -22,7 +22,8 @@ export interface OrderItem {
 // ── キャスト ─────────────────────────────────────
 export interface Cast {
   id: string
-  name: string
+  name: string        // ニックネーム（源氏名。店内表示に使う）
+  realName?: string   // 本名（給与・CSV用）
   sortOrder: number
 }
 

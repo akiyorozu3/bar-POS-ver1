@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { usePosStore } from '@/store/posStore'
 import { displayUnit, calcBill } from '@/lib/tax'
+import { castLabel } from '@/lib/cast'
 import { FREE_PRESETS, MENU_CATEGORIES } from '@/lib/defaultMenus'
 import type { MenuItem } from '@/types'
 
@@ -245,7 +246,7 @@ export default function OrderScreen() {
                         }}
                       >
                         <option value="">担当未設定</option>
-                        {casts.map((c) => <option key={c.id}>{c.name}</option>)}
+                        {casts.map((c) => <option key={c.id}>{castLabel(c)}</option>)}
                       </select>
                       {list.length > 1 && (
                         <button
@@ -294,7 +295,7 @@ export default function OrderScreen() {
                         onChange={(e) => currentSeatId && changeItemCast(currentSeatId, item.id, e.target.value)}
                       >
                         <option value="">未設定</option>
-                        {casts.map((c) => <option key={c.id}>{c.name}</option>)}
+                        {casts.map((c) => <option key={c.id}>{castLabel(c)}</option>)}
                       </select>
                     </div>
                   )}
