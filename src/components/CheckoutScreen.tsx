@@ -109,7 +109,7 @@ export default function CheckoutScreen({ onBack }: Props) {
             <div key={x.id} className="co-row">
               <span className="co-row-name">{x.name} × {x.qty}</span>
               <span className="co-row-cast">{x.cast}</span>
-              <span className="co-row-price">
+              <span className={`co-row-price ${x.priceExTax < 0 ? 'minus' : ''}`}>
                 ¥{(x.priceExTax * x.qty).toLocaleString()}
               </span>
             </div>

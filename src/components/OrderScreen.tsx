@@ -18,6 +18,7 @@ export default function OrderScreen() {
   const [showTodayModal, setShowTodayModal] = useState(false)
   const [freeName, setFreeName] = useState('')
   const [freePrice, setFreePrice] = useState('')
+  const [discount, setDiscount] = useState('')
 
   const taxIncluded = taxMode === 'inclusive'
   const taxPct = Math.round(taxRate * 100)
@@ -60,6 +61,23 @@ export default function OrderScreen() {
     })
     setFreeName('')
     setFreePrice('')
+  }
+
+  // 割引：入力は正の金額、明細にはマイナスで追加する
+  const handleAddDiscount = () => {
+    if (!currentSeatId || !discount) return
+    const amt = Math.abs(parseInt(discount, 10))
+    if (!Number.isFinite(amt) || amt === 0) return
+    addOrderItem(currentSeatId, {
+      name: '割引',
+      priceExTax: -amt,
+      qty: 1,
+      cast: '',
+      category: 'フリー入力',
+      isToday: false,
+      isFree: true,
+    })
+    setDiscount('')
   }
 
   const allTabs: Tab[] = ['本日限定', ...MENU_CATEGORIES, 'フリー入力']
@@ -124,6 +142,23 @@ export default function OrderScreen() {
                   追加
                 </button>
               </div>
+
+              <p className="free-title" style={{ marginTop: 4 }}>割引（金額を入れると明細にマイナスで入ります）</p>
+              <div className="free-row">
+                <span className="discount-lbl">割引</span>
+                <input
+                  className="free-price-input"
+                  type="number"
+                  min="0"
+                  placeholder="割引額"
+                  value={discount}
+                  onChange={(e) => setDiscount(e.target.value)}
+                />
+                <button className="free-add-btn discount" onClick={handleAddDiscount}>
+                  割引追加
+                </button>
+              </div>
+
               <div className="quick-presets">
                 {FREE_PRESETS.map((p) => (
                   <button
@@ -246,7 +281,7 @@ export default function OrderScreen() {
                       <button className="qb" onClick={() => currentSeatId && changeQty(currentSeatId, item.id, -1)}>−</button>
                       <button className="qb" onClick={() => currentSeatId && changeQty(currentSeatId, item.id, +1)}>＋</button>
                     </span>
-                    <span className="t-row-price">
+                    <span className={`t-row-price ${item.priceExTax < 0 ? 'minus' : ''}`}>
                       ¥{(item.priceExTax * item.qty).toLocaleString()}
                     </span>
                   </div>
