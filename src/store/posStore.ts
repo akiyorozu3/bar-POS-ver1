@@ -217,13 +217,9 @@ export const usePosStore = create<PosState>((set, get) => {
   authError: null,
   signingIn: false,
 
-  seats: [
-    { id: 'A', name: '', solo: false, tableCasts: [], createdAt: Date.now() },
-    { id: 'B', name: '', solo: false, tableCasts: [], createdAt: Date.now() },
-    { id: 'C', name: '', solo: false, tableCasts: [], createdAt: Date.now() },
-  ],
+  seats: [],
   currentSeatId: readSeat(),
-  orders: { A: [], B: [], C: [] },
+  orders: {},
   menus: [],
   menusLoading: true,
   casts: [],
@@ -469,26 +465,23 @@ export const usePosStore = create<PosState>((set, get) => {
       _createdAt: serverTimestamp(),
     })
 
-    // 注文をクリア（席は残す）
-    set((s) => ({ orders: { ...s.orders, [seatId]: [] } }))
-    persistTable(seatId)
+    // 会計後は卓を削除する（席バーから消す）
+    const remaining = get().seats.filter((s) => s.id !== seatId)
+    const nextCurrent = remaining[0]?.id ?? null
+    set((s) => {
+      const orders = { ...s.orders }
+      delete orders[seatId]
+      return { seats: remaining, orders, currentSeatId: nextCurrent }
+    })
+    persistSeatId(nextCurrent)
+    deleteDoc(doc(db, COLLECTIONS.TABLES, seatId)).catch(() => {})
   },
 
   // ── Firestore 購読 ────────────────────────────
   subscribeTables: () => {
     const q = query(collection(db, COLLECTIONS.TABLES), orderBy('createdAt'))
     const unsub = onSnapshot(q, (snap) => {
-      // 初回（空）はデフォルト席 A/B/C を作成（固定IDなので重複しない）
-      if (snap.empty) {
-        const now = Date.now()
-        ;['A', 'B', 'C'].forEach((id, i) => {
-          setDoc(doc(db, COLLECTIONS.TABLES, id), {
-            name: '', solo: false, tableCasts: [], items: [],
-            createdAt: now + i, updatedAt: now,
-          }).catch(() => {})
-        })
-        return
-      }
+      // 卓は「＋追加」で開き、会計後に削除する運用（自動作成はしない）
       const seats: Seat[] = []
       const orders: Record<string, OrderItem[]> = {}
       snap.docs.forEach((d) => {
