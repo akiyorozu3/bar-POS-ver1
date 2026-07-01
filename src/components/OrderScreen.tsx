@@ -11,10 +11,16 @@ export default function OrderScreen() {
   const {
     seats, currentSeatId, orders,
     addSeat, updateSeat, setCurrentSeat,
-    menus, casts, addOrderItem, changeQty, changeItemCast, clearOrder, setTableCasts,
+    menus, casts, removeSeat, addOrderItem, changeQty, changeItemCast, clearOrder, setTableCasts,
     taxRate, taxMode, tableNames, role,
   } = usePosStore()
   const isOwner = role === 'owner'
+
+  const handleCloseSeat = (s: { id: string; name: string }) => {
+    const items = orders[s.id] ?? []
+    if (items.length > 0 && !confirm(`${s.name || '席'} に注文が入っています。会計せずに閉じますか？（内容は消えます）`)) return
+    removeSeat(s.id)
+  }
 
   const [tab, setTab] = useState<Tab>('セット')
   const [showTodayModal, setShowTodayModal] = useState(false)
@@ -90,14 +96,19 @@ export default function OrderScreen() {
       {/* 席バー */}
       <div className="seat-bar">
         {seats.map((s) => (
-          <button
+          <div
             key={s.id}
             className={`seat-chip ${s.id === currentSeatId ? 'active' : ''}`}
             onClick={() => setCurrentSeat(s.id)}
           >
             {s.solo && <span className="solo-dot" />}
-            {s.name || `席 ${s.id}`}
-          </button>
+            <span>{s.name || `席 ${s.id}`}</span>
+            <span
+              className="seat-close"
+              onClick={(e) => { e.stopPropagation(); handleCloseSeat(s) }}
+              title="この卓を閉じる"
+            >×</span>
+          </div>
         ))}
         {/* 定型テーブル（まだ開いていない卓だけワンタップで開く） */}
         {(() => {

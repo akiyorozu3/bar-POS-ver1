@@ -117,6 +117,7 @@ interface PosState {
   // アクション
   setEntryDate: (date: string) => void
   addSeat: (name: string, solo: boolean) => void
+  removeSeat: (seatId: string) => void
   updateSeat: (id: string, patch: Partial<Seat>) => void
   setTableCasts: (seatId: string, casts: string[]) => void
   setCurrentSeat: (id: string) => void
@@ -340,6 +341,19 @@ export const usePosStore = create<PosState>((set, get) => {
     }))
     persistSeatId(id)
     persistTable(id)
+  },
+
+  // 卓を閉じる（席バーから削除。会計はしない）
+  removeSeat: (seatId) => {
+    const remaining = get().seats.filter((s) => s.id !== seatId)
+    const nextCurrent = get().currentSeatId === seatId ? (remaining[0]?.id ?? null) : get().currentSeatId
+    set((s) => {
+      const orders = { ...s.orders }
+      delete orders[seatId]
+      return { seats: remaining, orders, currentSeatId: nextCurrent }
+    })
+    persistSeatId(nextCurrent)
+    deleteDoc(doc(db, COLLECTIONS.TABLES, seatId)).catch(() => {})
   },
 
   updateSeat: (id, patch) => {

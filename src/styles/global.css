@@ -17,6 +17,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .seat-chip { flex-shrink: 0; padding: 4px 12px; border-radius: 20px; font-size: 11px; border: 0.5px solid #ccc; cursor: pointer; color: #5f5e5a; background: #fff; white-space: nowrap; display: flex; align-items: center; gap: 4px; font-family: inherit; }
 .seat-chip.active { background: #378add; color: #fff; border-color: #378add; }
 .seat-chip.add { border-style: dashed; }
+.seat-close { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; font-size: 11px; line-height: 1; color: #999; background: rgba(0,0,0,.06); margin-left: 2px; }
+.seat-chip.active .seat-close { color: #fff; background: rgba(255,255,255,.25); }
 .seat-chip.quick { border-style: dashed; border-color: #378add; color: #185fa5; }
 .seat-chip.edit { border-style: dashed; border-color: #ccc; color: #888780; font-size: 10px; }
 .table-names-list { display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; }
