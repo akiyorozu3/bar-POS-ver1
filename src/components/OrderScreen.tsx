@@ -12,11 +12,13 @@ export default function OrderScreen() {
     seats, currentSeatId, orders,
     addSeat, updateSeat, setCurrentSeat,
     menus, casts, addOrderItem, changeQty, changeItemCast, clearOrder, setTableCasts,
-    taxRate, taxMode,
+    taxRate, taxMode, tableNames, role,
   } = usePosStore()
+  const isOwner = role === 'owner'
 
   const [tab, setTab] = useState<Tab>('セット')
   const [showTodayModal, setShowTodayModal] = useState(false)
+  const [showTableModal, setShowTableModal] = useState(false)
   const [freeName, setFreeName] = useState('')
   const [freePrice, setFreePrice] = useState('')
   const [discount, setDiscount] = useState('')
@@ -97,9 +99,23 @@ export default function OrderScreen() {
             {s.name || `席 ${s.id}`}
           </button>
         ))}
+        {/* 定型テーブル（まだ開いていない卓だけワンタップで開く） */}
+        {(() => {
+          const open = new Set(seats.map((s) => s.name).filter(Boolean))
+          return tableNames.filter((n) => !open.has(n)).map((n) => (
+            <button key={n} className="seat-chip quick" onClick={() => addSeat(n, false)}>
+              {n}
+            </button>
+          ))
+        })()}
         <button className="seat-chip add" onClick={() => addSeat('', false)}>
           ＋ 追加
         </button>
+        {isOwner && (
+          <button className="seat-chip edit" onClick={() => setShowTableModal(true)}>
+            定型編集
+          </button>
+        )}
       </div>
 
       <div className="order-body">
@@ -342,6 +358,63 @@ export default function OrderScreen() {
       {showTodayModal && (
         <TodayMenuModal onClose={() => setShowTodayModal(false)} />
       )}
+      {showTableModal && (
+        <TableNamesModal onClose={() => setShowTableModal(false)} />
+      )}
+    </div>
+  )
+}
+
+// ── 定型テーブル名の編集モーダル ─────────────────
+function TableNamesModal({ onClose }: { onClose: () => void }) {
+  const { tableNames, saveTableNames } = usePosStore()
+  const [names, setNames] = useState<string[]>(tableNames)
+  const [input, setInput] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const add = () => {
+    const v = input.trim()
+    if (!v || names.includes(v)) { setInput(''); return }
+    setNames([...names, v])
+    setInput('')
+  }
+  const remove = (n: string) => setNames(names.filter((x) => x !== n))
+
+  const handleSave = async () => {
+    setBusy(true)
+    try { await saveTableNames(names); onClose() } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-title">定型テーブルの編集</div>
+        <label>テーブル名を追加（例：C1）</label>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          <input
+            style={{ flex: 1, marginBottom: 0 }}
+            placeholder="例：C1"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') add() }}
+          />
+          <button className="modal-btn ok" style={{ flex: 'none', width: 64 }} onClick={add}>＋</button>
+        </div>
+        <div className="table-names-list">
+          {names.length === 0
+            ? <p style={{ fontSize: 11, color: '#888780' }}>まだありません。よく使う卓名を追加してください。</p>
+            : names.map((n) => (
+              <div key={n} className="table-name-row">
+                <span>{n}</span>
+                <button className="tm-del" onClick={() => remove(n)}>削除</button>
+              </div>
+            ))}
+        </div>
+        <div className="modal-btns" style={{ marginTop: 10 }}>
+          <button className="modal-btn" onClick={onClose}>キャンセル</button>
+          <button className="modal-btn ok" onClick={handleSave} disabled={busy}>保存</button>
+        </div>
+      </div>
     </div>
   )
 }

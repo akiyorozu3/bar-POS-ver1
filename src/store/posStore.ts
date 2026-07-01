@@ -84,6 +84,9 @@ interface PosState {
   // 入力日（会計を記録する日付。YYYY-MM-DD。遡及入力用に変更可）
   entryDate: string
 
+  // 定型テーブル名（席バーのワンタップ用。例 ['C1','C2',...]）
+  tableNames: string[]
+
   // レジ締め済みの日付（YYYY-MM-DD）の一覧
   closedDates: string[]
 
@@ -160,6 +163,9 @@ interface PosState {
 
   saveTaxSettings: (settings: TaxSettings) => Promise<void>
   loadTaxSettings: () => Promise<void>
+
+  saveTableNames: (names: string[]) => Promise<void>
+  loadTableNames: () => Promise<void>
 }
 
 let seatCounter = 0
@@ -233,6 +239,7 @@ export const usePosStore = create<PosState>((set, get) => {
   taxRate: DEFAULT_TAX_RATE,
   taxMode: 'exclusive',
   entryDate: todayStr(),
+  tableNames: [],
   closedDates: [],
   punches: [],
   payouts: [],
@@ -705,6 +712,19 @@ export const usePosStore = create<PosState>((set, get) => {
     if (snap.exists()) {
       const d = snap.data() as TaxSettings
       set({ taxRate: d.rate, taxMode: d.mode })
+    }
+  },
+
+  // ── 定型テーブル名の永続化 ─────────────────────
+  saveTableNames: async (names) => {
+    set({ tableNames: names })
+    await setDoc(doc(db, COLLECTIONS.SETTINGS, 'tableNames'), { names })
+  },
+
+  loadTableNames: async () => {
+    const snap = await getDoc(doc(db, COLLECTIONS.SETTINGS, 'tableNames'))
+    if (snap.exists()) {
+      set({ tableNames: (snap.data() as { names?: string[] }).names ?? [] })
     }
   },
   }
