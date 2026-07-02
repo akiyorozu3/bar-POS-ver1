@@ -18,7 +18,7 @@ export default function LoginScreen() {
     <div className="login-screen">
       <form className="login-card" onSubmit={handleSubmit}>
         <div className="login-title">バーPOS</div>
-        <div className="login-sub">ユーザーIDとパスワードを入力してください</div>
+        <div className="login-sub">ようこそ。ユーザーIDとパスワードでログインしてください</div>
 
         <label className="login-lbl">ユーザーID</label>
         <input
