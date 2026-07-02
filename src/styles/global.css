@@ -343,3 +343,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .mm-row-del { font-size: 11px; padding: 5px 10px; border-radius: 6px; border: 0.5px solid #d8a3a3; background: #fff; color: #a32d2d; cursor: pointer; font-family: inherit; }
 .mm-row-del:disabled { opacity: .5; cursor: not-allowed; }
 .mm-note { font-size: 10px; color: #888780; line-height: 1.7; padding: 4px 2px; }
+
+/* テスト環境（staging）バナー */
+.test-env-banner {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: repeating-linear-gradient(45deg, #b8860b, #b8860b 12px, #9a7209 12px, #9a7209 24px);
+  color: #fff;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 10px;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}

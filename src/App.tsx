@@ -14,6 +14,17 @@ type Screen = 'order' | 'checkout' | 'sales' | 'menu' | 'cast' | 'punchmgr'
 // 打刻をスタッフにも開放（打刻管理タブはオーナーのみのまま）
 const PUNCH_STAFF_ENABLED = true
 
+// テスト環境（staging）では画面上部に警告バナーを出し、本番との取り違えを防ぐ
+const IS_TEST_ENV = import.meta.env.VITE_APP_ENV === 'staging'
+
+function TestEnvBanner() {
+  return (
+    <div className="test-env-banner">
+      🧪 テスト環境（練習用）— ここでの入力は本番に反映されません
+    </div>
+  )
+}
+
 const readScreen = (): Screen => {
   try { return (localStorage.getItem('pos:screen') as Screen) || 'order' } catch { return 'order' }
 }
@@ -77,10 +88,16 @@ export default function App() {
   if (!authReady) return <div className="app"><div className="loading">読み込み中...</div></div>
 
   // 未ログイン
-  if (!user) return <LoginScreen />
+  if (!user) return (
+    <>
+      {IS_TEST_ENV && <TestEnvBanner />}
+      <LoginScreen />
+    </>
+  )
 
   return (
     <div className="app">
+      {IS_TEST_ENV && <TestEnvBanner />}
       {/* トップバー（ユーザー情報・ログアウト） */}
       <div className={`topbar ${backdated ? 'backdated' : ''}`}>
         <span className="topbar-role">

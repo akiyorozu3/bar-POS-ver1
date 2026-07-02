@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "bar-pos-b1993"
+    "default": "bar-pos-b1993",
+    "staging": "bar-pos-staging"
   }
 }
