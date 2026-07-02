@@ -6,12 +6,12 @@
 
 import { initializeApp } from 'firebase/app'
 import { getFirestore, connectFirestoreEmulator, doc, setDoc, collection } from 'firebase/firestore'
-import { getAuth, connectAuthEmulator, createUserWithEmailAndPassword } from 'firebase/auth'
+import { getAuth, connectAuthEmulator, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth'
 
 const app = initializeApp({ apiKey: 'demo-api-key', projectId: 'demo-bar-pos', authDomain: 'demo-bar-pos.firebaseapp.com' })
 const db = getFirestore(app)
 const auth = getAuth(app)
-connectFirestoreEmulator(db, '127.0.0.1', 8080)
+connectFirestoreEmulator(db, '127.0.0.1', 8085)
 connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
 
 const DOMAIN = process.env.VITE_AUTH_ID_DOMAIN || 'bar-pos.local'
@@ -46,6 +46,9 @@ async function main() {
   console.log('- アカウント')
   await ensureUser('owner', 'password')
   await ensureUser('staff', '000000')
+
+  // Firestore への書き込みはオーナー権限が要る（ルール準拠）ため owner でサインイン
+  await signInWithEmailAndPassword(auth, `owner@${DOMAIN}`, 'password')
 
   console.log('- 設定')
   await setDoc(doc(db, 'settings', 'tax'), { rate: 0.1, mode: 'exclusive' })

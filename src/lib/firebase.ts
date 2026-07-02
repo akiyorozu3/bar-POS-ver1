@@ -20,7 +20,7 @@ export const auth = getAuth(app)
 // 本番ビルド（.env.production 等）ではこのフラグは無いので接続されない。
 export const USE_EMULATOR = import.meta.env.VITE_USE_EMULATOR === 'true'
 if (USE_EMULATOR) {
-  connectFirestoreEmulator(db, '127.0.0.1', 8080)
+  connectFirestoreEmulator(db, '127.0.0.1', 8085)
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
   // eslint-disable-next-line no-console
   console.info('[bar-pos] Firebase エミュレータに接続中（本番には接続していません）')
