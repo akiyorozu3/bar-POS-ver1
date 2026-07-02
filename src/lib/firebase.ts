@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app'
-import { getFirestore } from 'firebase/firestore'
-import { getAuth } from 'firebase/auth'
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
+import { getAuth, connectAuthEmulator } from 'firebase/auth'
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -14,6 +14,17 @@ const firebaseConfig = {
 export const app = initializeApp(firebaseConfig)
 export const db = getFirestore(app)
 export const auth = getAuth(app)
+
+// 開発用: VITE_USE_EMULATOR=true のときだけローカルのエミュレータに接続する。
+// これにより本番Firestore/Authに一切触れずに開発・検証できる。
+// 本番ビルド（.env.production 等）ではこのフラグは無いので接続されない。
+export const USE_EMULATOR = import.meta.env.VITE_USE_EMULATOR === 'true'
+if (USE_EMULATOR) {
+  connectFirestoreEmulator(db, '127.0.0.1', 8080)
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
+  // eslint-disable-next-line no-console
+  console.info('[bar-pos] Firebase エミュレータに接続中（本番には接続していません）')
+}
 
 // Firestore コレクション名の定数
 export const COLLECTIONS = {
