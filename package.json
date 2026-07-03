@@ -10,6 +10,7 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "emu": "firebase emulators:start --only auth,firestore --project demo-bar-pos",
     "dev:emu": "vite --mode emulator",
+    "dev:staging": "vite --mode staging",
     "seed:emu": "node scripts/seed-emulator.mjs",
     "seed:staging": "node scripts/seed-staging.mjs",
     "build:staging": "tsc && vite build --mode staging",
