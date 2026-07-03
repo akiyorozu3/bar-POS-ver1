@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { usePosStore, todayStr, dateStrOf } from '@/store/posStore'
+import { usePosStore, todayStr, dateStrOf, businessDayStart, businessDayEnd } from '@/store/posStore'
 import type { Transaction } from '@/types'
 import { useSalesSummary } from '@/hooks/useSalesSummary'
 import { buildTransactionCSV, buildCastCSV, downloadCSV } from '@/lib/csv'
@@ -15,23 +15,22 @@ const PAY_METHOD_CLS: Record<PayMethod, string> = {
 }
 
 function periodRange(period: Period, entryDate: string): [Date, Date] {
-  // 今日・今週はヘッダーの入力日を基準にする（今月は実際の今日基準のまま）
-  const ref = new Date(`${entryDate}T00:00:00`)
-  const base = isNaN(ref.getTime()) ? new Date() : ref
+  // 営業日は 17:00〜翌17:00。範囲は実時刻の [営業日開始, 終端) で表す。
+  // entryDate（ヘッダーの営業日）を基準にする。
+  const dateStr = /^\d{4}-\d{2}-\d{2}$/.test(entryDate) ? entryDate : todayStr()
+  // その営業日の終端（翌営業日の開始の直前ミリ秒）
+  const to = new Date(businessDayEnd(dateStr).getTime() - 1)
   if (period === 'today') {
-    const from = new Date(base.getFullYear(), base.getMonth(), base.getDate())
-    const to = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 23, 59, 59, 999)
-    return [from, to]
+    return [businessDayStart(dateStr), to]
   }
   if (period === 'week') {
-    const to = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 23, 59, 59, 999)
-    const from = new Date(base); from.setDate(base.getDate() - 6); from.setHours(0, 0, 0, 0)
+    const from = businessDayStart(dateStr)
+    from.setDate(from.getDate() - 6) // 直近7営業日
     return [from, to]
   }
-  // 今月：実際の今日基準（そのまま）
-  const now = new Date()
-  const from = new Date(now.getFullYear(), now.getMonth(), 1)
-  const to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+  // 今月：その営業日が属する月の1日（営業日）から
+  const [y, m] = dateStr.split('-').map(Number)
+  const from = businessDayStart(`${y}-${String(m).padStart(2, '0')}-01`)
   return [from, to]
 }
 

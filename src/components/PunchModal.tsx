@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { usePosStore, todayStr } from '@/store/posStore'
+import { usePosStore, todayStr, businessDayStart, businessDayEnd } from '@/store/posStore'
 import { castLabel } from '@/lib/cast'
 
 const hhmm = (at: number) =>
@@ -11,11 +11,10 @@ export default function PunchModal({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false)
   const [flash, setFlash] = useState('')
 
-  // 今日の打刻を購読
+  // 今日（営業日 17:00〜翌17:00）の打刻を購読
   useEffect(() => {
-    const now = new Date()
-    const from = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+    const from = businessDayStart(todayStr())
+    const to = businessDayEnd(todayStr())
     return subscribePunches(from, to)
   }, [subscribePunches])
 

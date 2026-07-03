@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { usePosStore, todayStr } from '@/store/posStore'
+import { usePosStore, todayStr, businessDayStart, businessDayEnd } from '@/store/posStore'
 import { castLabel } from '@/lib/cast'
 import { buildShifts, hhmm, durationLabel, toDatetimeLocal, fromDatetimeLocal } from '@/lib/punch'
 import { buildShiftCSV, downloadCSV } from '@/lib/csv'
@@ -12,10 +12,10 @@ export default function PunchManageScreen() {
   const [showEdit, setShowEdit] = useState(false)
   const [problemOnly, setProblemOnly] = useState(false)
 
-  // 日またぎ対応のため前後12時間バッファを付けて購読
+  // 営業日(17:00〜翌17:00)の範囲＋前後12時間バッファを付けて購読（日またぎ対応）
   useEffect(() => {
-    const bf = new Date(`${from}T00:00:00`); bf.setHours(bf.getHours() - 12)
-    const bt = new Date(`${to}T23:59:59`); bt.setHours(bt.getHours() + 12)
+    const bf = businessDayStart(from); bf.setHours(bf.getHours() - 12)
+    const bt = businessDayEnd(to); bt.setHours(bt.getHours() + 12)
     if (isNaN(bf.getTime()) || isNaN(bt.getTime())) return
     return subscribePunches(bf, bt)
   }, [from, to, subscribePunches])

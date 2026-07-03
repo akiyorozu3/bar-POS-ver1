@@ -174,18 +174,33 @@ const newSeatId = () => `seat-${++seatCounter}-${Date.now()}`
 const newItemId = () => `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 
 // YYYY-MM-DD（ローカル日付）
+// 営業日の開始時刻（17:00）。この時刻を境に「日付」が変わる。
+// 深夜帯（翌0:00〜16:59）の売上・打刻は、前日の営業日として集計される。
+export const BUSINESS_DAY_START_HOUR = 17
+// タイムスタンプ → 営業日（YYYY-MM-DD）。17時より前は前営業日扱い（17h引いてから暦日を取る）
 export const dateStrOf = (ts: number) => {
-  const d = new Date(ts)
+  const d = new Date(ts - BUSINESS_DAY_START_HOUR * 60 * 60 * 1000)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 export const todayStr = () => dateStrOf(Date.now())
-// 入力日（entryDate, YYYY-MM-DD）から会計時刻を作る。今日ならそのまま現在時刻、過去日ならその日付＋現在時刻
+// 営業日(YYYY-MM-DD)の実時刻の開始（その日の17:00）
+export const businessDayStart = (dateStr: string): Date =>
+  new Date(`${dateStr}T${String(BUSINESS_DAY_START_HOUR).padStart(2, '0')}:00:00`)
+// 営業日(YYYY-MM-DD)の終端＝翌営業日の開始（翌日17:00）。範囲は [start, end) 排他で使う
+export const businessDayEnd = (dateStr: string): Date => {
+  const d = businessDayStart(dateStr)
+  d.setDate(d.getDate() + 1)
+  return d
+}
+// 入力日（entryDate, 営業日 YYYY-MM-DD）から会計時刻を作る。今日ならそのまま現在時刻、過去日ならその営業日内の現在時刻相当
 const entryDateToTs = (entryDate: string): number => {
   if (entryDate === todayStr()) return Date.now()
   const d = new Date(`${entryDate}T00:00:00`)
   if (isNaN(d.getTime())) return Date.now()
   const now = new Date()
   d.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds())
+  // 17時より前の時刻は翌カレンダー日に置き、営業日が entryDate に一致するようにする
+  if (now.getHours() < BUSINESS_DAY_START_HOUR) d.setDate(d.getDate() + 1)
   return d.getTime()
 }
 
