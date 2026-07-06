@@ -54,6 +54,8 @@ export default function OrderScreen() {
       category: m.category,
       isToday: m.isToday,
       isFree: false,
+      // キャストドリンクで円バックが設定されていれば記録（会計後もこの額でバック計算）
+      ...(m.category === 'キャストドリンク' && m.drinkBack != null ? { drinkBack: m.drinkBack } : {}),
     })
   }
 

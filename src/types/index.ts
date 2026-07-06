@@ -17,6 +17,7 @@ export interface OrderItem {
   category: string     // カテゴリ（キャストドリンク判定等。フリー入力は'フリー入力'）
   isToday: boolean     // 本日限定メニューフラグ
   isFree: boolean      // フリー入力フラグ
+  drinkBack?: number   // 記録時のドリンクバック額（円/杯）。キャストドリンクのみ。未設定なら旧ドリンクバック率(%)で計算
 }
 
 // ── キャスト ─────────────────────────────────────
@@ -47,6 +48,7 @@ export interface MenuItem {
   category: string
   isToday: boolean     // 本日限定メニュー
   sortOrder: number
+  drinkBack?: number   // キャストドリンクの1杯あたりバック額（円）。未設定なら旧ドリンクバック率(%)を使う
 }
 
 // ── 支払い方法 ───────────────────────────────────

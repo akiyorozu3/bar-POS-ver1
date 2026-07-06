@@ -337,6 +337,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .mm-row { display: flex; align-items: center; gap: 6px; padding: 5px 0; }
 .mm-row-name { flex: 1; min-width: 0; padding: 6px 8px; border: 0.5px solid #e0ddd5; border-radius: 6px; background: #f8f7f4; color: #1a1a18; font-size: 12px; font-family: inherit; outline: none; }
 .mm-row-price { width: 70px; padding: 6px 8px; border: 0.5px solid #e0ddd5; border-radius: 6px; background: #f8f7f4; color: #1a1a18; font-size: 12px; font-family: inherit; outline: none; text-align: right; }
+.mm-add-back, .mm-row-back { width: 78px; padding: 6px 8px; border: 0.5px solid #c9a24b; border-radius: 6px; background: #fdf8ec; color: #6b4e12; font-size: 12px; font-family: inherit; outline: none; text-align: right; }
+.mm-add-back::placeholder, .mm-row-back::placeholder { color: #b08b3f; }
 .mm-row-inc { font-size: 10px; color: #888780; white-space: nowrap; min-width: 70px; text-align: right; }
 .mm-row-save { font-size: 11px; padding: 5px 10px; border-radius: 6px; border: 0.5px solid #378add; background: #fff; color: #185fa5; cursor: pointer; font-family: inherit; }
 .mm-row-save:disabled { opacity: .4; cursor: not-allowed; border-color: #ccc; color: #888780; }

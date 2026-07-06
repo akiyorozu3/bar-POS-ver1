@@ -56,13 +56,17 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
         }
       }
 
-      // ② ドリンクバック：キャストドリンク料金 × ドリンクバック率 を、その品目の担当へ上乗せ
+      // ② ドリンクバック：その品目の担当へ上乗せ
+      //   drinkBack（円/杯）が記録されていればそれ×杯数、無ければ旧仕様の 料金×ドリンクバック率
       for (const item of t.items) {
         if (item.category !== DRINK_CATEGORY) continue
         const c = item.cast || UNASSIGNED
         const amt = item.priceExTax * item.qty
         const e = ensure(c)
-        if (c !== UNASSIGNED) e.backRaw += amt * drinkBackRate
+        if (c !== UNASSIGNED) {
+          const back = item.drinkBack != null ? item.drinkBack * item.qty : amt * drinkBackRate
+          e.backRaw += back
+        }
         // ドリンク分の売上も可視化（卓担当の卓売上とは別計上）
         e.salesAmount += amt
       }

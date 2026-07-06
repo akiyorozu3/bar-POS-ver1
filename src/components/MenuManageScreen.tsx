@@ -13,8 +13,10 @@ export default function MenuManageScreen() {
   const [name, setName] = useState('')
   const [price, setPrice] = useState('')
   const [category, setCategory] = useState<AddCategory>('ウイスキー')
+  const [drinkBack, setDrinkBack] = useState('')
   const [busy, setBusy] = useState(false)
 
+  const isDrink = category === 'キャストドリンク'
   const priceNum = parseInt(price, 10)
   const canAdd = name.trim().length > 0 && Number.isFinite(priceNum) && priceNum > 0
 
@@ -24,15 +26,19 @@ export default function MenuManageScreen() {
     try {
       const isToday = category === '本日限定'
       const sortOrder = menus.reduce((max, m) => Math.max(max, m.sortOrder), 0) + 1
+      const backNum = parseInt(drinkBack, 10)
       await addMenu({
         name: name.trim(),
         priceExTax: priceNum,
         category: isToday ? '本日限定' : category,
         isToday,
         sortOrder,
+        // キャストドリンクのときだけ円バックを保存
+        ...(isDrink && Number.isFinite(backNum) && backNum >= 0 ? { drinkBack: backNum } : {}),
       })
       setName('')
       setPrice('')
+      setDrinkBack('')
     } catch (e) {
       alert('メニューの追加に失敗しました。\n' + ((e as Error)?.message ?? e))
     } finally {
@@ -97,6 +103,16 @@ export default function MenuManageScreen() {
               value={price}
               onChange={(e) => setPrice(e.target.value)}
             />
+            {isDrink && (
+              <input
+                className="mm-add-back"
+                type="number"
+                min="0"
+                placeholder="バック円"
+                value={drinkBack}
+                onChange={(e) => setDrinkBack(e.target.value)}
+              />
+            )}
             <button className="mm-add-btn" onClick={handleAdd} disabled={!canAdd || busy}>＋ 追加</button>
           </div>
           {!taxIncluded && price !== '' && parseInt(price, 10) > 0 && (
@@ -135,19 +151,27 @@ export default function MenuManageScreen() {
 function MenuRow({ menu }: { menu: MenuItem }) {
   const { updateMenu, deleteMenu, taxRate, taxMode } = usePosStore()
   const taxIncluded = taxMode === 'inclusive'
+  const isDrink = menu.category === 'キャストドリンク'
   const [name, setName] = useState(menu.name)
   const [price, setPrice] = useState(String(menu.priceExTax))
+  const [drinkBack, setDrinkBack] = useState(menu.drinkBack != null ? String(menu.drinkBack) : '')
   const [busy, setBusy] = useState(false)
 
   const priceNum = parseInt(price, 10)
-  const dirty = name.trim() !== menu.name || (Number.isFinite(priceNum) && priceNum !== menu.priceExTax)
-  const valid = name.trim().length > 0 && Number.isFinite(priceNum) && priceNum > 0
+  const backStr0 = menu.drinkBack != null ? String(menu.drinkBack) : ''
+  const backNum = parseInt(drinkBack, 10)
+  const backChanged = isDrink && drinkBack.trim() !== backStr0
+  const backValid = drinkBack.trim() === '' || (Number.isFinite(backNum) && backNum >= 0)
+  const dirty = name.trim() !== menu.name || (Number.isFinite(priceNum) && priceNum !== menu.priceExTax) || backChanged
+  const valid = name.trim().length > 0 && Number.isFinite(priceNum) && priceNum > 0 && backValid
 
   const handleSave = async () => {
     if (!dirty || !valid) return
     setBusy(true)
     try {
-      await updateMenu(menu.id, { name: name.trim(), priceExTax: priceNum })
+      const patch: Partial<Omit<MenuItem, 'id'>> = { name: name.trim(), priceExTax: priceNum }
+      if (isDrink && drinkBack.trim() !== '' && Number.isFinite(backNum)) patch.drinkBack = backNum
+      await updateMenu(menu.id, patch)
     } finally {
       setBusy(false)
     }
@@ -178,6 +202,17 @@ function MenuRow({ menu }: { menu: MenuItem }) {
           ? '税込'
           : `税込 ¥${Number.isFinite(priceNum) ? displayUnit(priceNum, taxRate, taxMode).toLocaleString() : '—'}`}
       </span>
+      {isDrink && (
+        <input
+          className="mm-row-back"
+          type="number"
+          min="0"
+          placeholder="バック円"
+          value={drinkBack}
+          onChange={(e) => setDrinkBack(e.target.value)}
+          title="キャストドリンクの1杯あたりバック額（円）"
+        />
+      )}
       <button className="mm-row-save" onClick={handleSave} disabled={!dirty || !valid || busy}>保存</button>
       <button className="mm-row-del" onClick={handleDelete} disabled={busy}>削除</button>
     </div>
