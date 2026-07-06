@@ -80,7 +80,8 @@ export interface Transaction {
   netAmount: number    // 実入金額
   primaryCast: string   // 売上が最も多いキャスト（CSV表示用）
   tableCasts: string[]  // 卓バックの受取キャスト（卓の担当。複数なら頭割り）
-  completedAt: number   // Unix timestamp
+  completedAt: number   // 会計時刻（Unix ミリ秒）
+  openedAt?: number     // 席を立ち上げた時刻（Unix ミリ秒）。旧データには無い
 }
 
 // ── 手数料設定 ───────────────────────────────────

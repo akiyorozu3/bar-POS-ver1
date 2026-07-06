@@ -14,6 +14,14 @@ const PAY_METHOD_CLS: Record<PayMethod, string> = {
   cash: 'method-cash', card: 'method-card', qr: 'method-qr',
 }
 
+// 滞在時間（ミリ秒 → 「2時間15分」）。0以下は空文字
+function fmtDur(ms: number): string {
+  if (!(ms > 0)) return ''
+  const min = Math.round(ms / 60000)
+  const h = Math.floor(min / 60), m = min % 60
+  return h > 0 ? `${h}時間${m}分` : `${m}分`
+}
+
 function periodRange(period: Period, entryDate: string): [Date, Date] {
   // 営業日は 17:00〜翌17:00。範囲は実時刻の [営業日開始, 終端) で表す。
   // entryDate（ヘッダーの営業日）を基準にする。
@@ -487,6 +495,12 @@ export default function SalesScreen() {
             <div className="modal-title">
               {viewTx.seatName}（{new Date(viewTx.completedAt).toLocaleString('ja-JP')}）
             </div>
+            {viewTx.openedAt != null && (
+              <div className="tx-view-time">
+                <i className="ti ti-clock-play" aria-hidden /> 立ち上げ {new Date(viewTx.openedAt).toLocaleString('ja-JP')}
+                {fmtDur(viewTx.completedAt - viewTx.openedAt) && <span className="tx-view-dur">／ 滞在 {fmtDur(viewTx.completedAt - viewTx.openedAt)}</span>}
+              </div>
+            )}
             <div className="tx-view-list">
               {viewTx.items.map((x) => (
                 <div key={x.id} className="co-row">

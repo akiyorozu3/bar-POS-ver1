@@ -494,6 +494,7 @@ export const usePosStore = create<PosState>((set, get) => {
       primaryCast,
       tableCasts,
       completedAt: entryDateToTs(entryDate),
+      openedAt: seat.createdAt,
     }
 
     await addDoc(collection(db, COLLECTIONS.TRANSACTIONS), {
@@ -677,7 +678,7 @@ export const usePosStore = create<PosState>((set, get) => {
     const id = newSeatId()
     const items = tx.items.map((it) => ({ ...it, id: newItemId() }))
     set((s) => ({
-      seats: [...s.seats, { id, name: tx.seatName ?? '', solo: !!tx.solo, tableCasts: tx.tableCasts ?? [], createdAt: Date.now() }],
+      seats: [...s.seats, { id, name: tx.seatName ?? '', solo: !!tx.solo, tableCasts: tx.tableCasts ?? [], createdAt: tx.openedAt ?? Date.now() }],
       orders: { ...s.orders, [id]: items },
       currentSeatId: id,
       entryDate: dateStrOf(tx.completedAt),
