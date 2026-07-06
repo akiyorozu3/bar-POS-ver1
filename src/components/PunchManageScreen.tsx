@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { usePosStore, todayStr, businessDayStart, businessDayEnd } from '@/store/posStore'
+import { usePosStore, todayStr, dateStrOf, businessDayStart, businessDayEnd } from '@/store/posStore'
 import { castLabel } from '@/lib/cast'
 import { buildShifts, hhmm, durationLabel, toDatetimeLocal, fromDatetimeLocal } from '@/lib/punch'
 import { buildShiftCSV, downloadCSV } from '@/lib/csv'
@@ -23,8 +23,10 @@ export default function PunchManageScreen() {
   const inRange = (d: string) => d >= from && d <= to
   const { shifts, strayOuts } = buildShifts(punches)
   const shownShifts = shifts.filter((s) => inRange(s.date))
-  const shownStray = strayOuts.filter((p) => inRange(p.date))
-  const rawInRange = punches.filter((p) => inRange(p.date)).sort((a, b) => b.at - a.at)
+  // 絞り込みは保存済みの date ではなく at から営業日を再計算して行う
+  // （17:00営業日の導入前後で保存 date の意味が混在しているため。勤務一覧と基準を揃える）
+  const shownStray = strayOuts.filter((p) => inRange(dateStrOf(p.at)))
+  const rawInRange = punches.filter((p) => inRange(dateStrOf(p.at))).sort((a, b) => b.at - a.at)
 
   // 不整合（未退勤 = 出勤のまま / 退勤のみ = 出勤なし退勤）
   const openShifts = shownShifts.filter((s) => s.outAt == null)
