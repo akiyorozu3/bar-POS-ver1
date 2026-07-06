@@ -77,11 +77,13 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
     const avgPerCustomer = txCount > 0 ? Math.round(totalSales / txCount) : 0
 
     const castSummaries = Object.entries(castMap)
+      // 卓もドリンクも担当が未設定の分（UNASSIGNED）はキャストバック集計に出さない
+      .filter(([name]) => name !== UNASSIGNED)
       .map(([name, v]) => ({
         name,
         txCount: v.txCount,
         salesAmount: Math.round(v.salesAmount),
-        backAmount: name === UNASSIGNED ? 0 : Math.round(v.backRaw),
+        backAmount: Math.round(v.backRaw),
       }))
       .sort((a, b) => b.salesAmount - a.salesAmount)
 
