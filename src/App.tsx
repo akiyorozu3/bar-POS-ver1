@@ -8,6 +8,7 @@ import CastManageScreen from '@/components/CastManageScreen'
 import PunchModal from '@/components/PunchModal'
 import PunchManageScreen from '@/components/PunchManageScreen'
 import LoginScreen from '@/components/LoginScreen'
+import { startVersionCheck } from '@/lib/versionCheck'
 
 type Screen = 'order' | 'checkout' | 'sales' | 'menu' | 'cast' | 'punchmgr'
 
@@ -32,6 +33,7 @@ const readScreen = (): Screen => {
 export default function App() {
   const [screen, setScreenRaw] = useState<Screen>(readScreen)
   const [showPunch, setShowPunch] = useState(false)
+  const [newVersion, setNewVersion] = useState(false)
   const setScreen = (s: Screen) => {
     setScreenRaw(s)
     try { localStorage.setItem('pos:screen', s) } catch { /* ignore */ }
@@ -51,6 +53,9 @@ export default function App() {
     const unsub = initAuth()
     return unsub
   }, [initAuth])
+
+  // アプリの自動アップデート検知（新しい版が出たらバナーを表示）
+  useEffect(() => startVersionCheck(() => setNewVersion(true)), [])
 
   // ログイン後にメニュー・キャスト・設定を購読・ロード（Firestoreは認証必須）
   useEffect(() => {
@@ -97,6 +102,11 @@ export default function App() {
 
   return (
     <div className="app">
+      {newVersion && (
+        <div className="update-banner" onClick={() => location.reload()}>
+          🔄 新しいバージョンがあります — タップして更新
+        </div>
+      )}
       {IS_TEST_ENV && <TestEnvBanner />}
       {/* トップバー（ユーザー情報・ログアウト） */}
       <div className={`topbar ${backdated ? 'backdated' : ''}`}>

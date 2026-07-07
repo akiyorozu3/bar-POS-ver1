@@ -348,6 +348,24 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .mm-row-del:disabled { opacity: .5; cursor: not-allowed; }
 .mm-note { font-size: 10px; color: #888780; line-height: 1.7; padding: 4px 2px; }
 
+/* 自動アップデート検知バナー */
+.update-banner {
+  position: sticky;
+  top: 0;
+  z-index: 2000;
+  background: #1d9e75;
+  color: #fff;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 10px;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  animation: update-pulse 2s ease-in-out infinite;
+}
+@keyframes update-pulse { 0%,100% { background: #1d9e75; } 50% { background: #178f68; } }
+
 /* テスト環境（staging）バナー */
 .test-env-banner {
   position: sticky;
