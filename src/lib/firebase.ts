@@ -36,4 +36,6 @@ export const COLLECTIONS = {
   CLOSURES: 'closures',
   PUNCHES: 'punches',
   PAYOUTS: 'payouts',
+  EXPENSES: 'expenses',
+  RECURRING_EXPENSES: 'recurringExpenses',
 } as const

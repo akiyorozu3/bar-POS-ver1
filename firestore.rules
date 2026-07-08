@@ -47,6 +47,14 @@ service cloud.firestore {
       allow read, write: if isOwner();
     }
 
+    // 経費・固定費：オーナーのみ（売上管理・実入金に関わる）
+    match /expenses/{id} {
+      allow read, write: if isOwner();
+    }
+    match /recurringExpenses/{id} {
+      allow read, write: if isOwner();
+    }
+
     // 手数料設定：ログイン済みは閲覧可（会計計算に必要） / 変更はオーナーのみ
     match /settings/{id} {
       allow read: if isAuthed();

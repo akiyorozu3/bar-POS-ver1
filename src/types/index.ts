@@ -113,6 +113,29 @@ export interface Payout {
   at: number               // 記録時刻
 }
 
+// ── 経費（単発） ─────────────────────────────────
+// オーナーが記録する経費/雑収入。amount は ＋＝収入・戻し、−＝支出。
+// 全て現金前提。実際の入金合計とレジの金庫現金の両方から控除（＋は加算）。
+export interface Expense {
+  id: string
+  date: string       // YYYY-MM-DD（対象営業日）
+  item: string       // 品目
+  amount: number     // 円（＋収入/−支出）
+  at: number         // 記録時刻
+}
+
+// ── 固定費（定期） ───────────────────────────────
+// 毎月◯日 / 毎週◯曜 に自動計上する固定費。全て現金前提で、
+// 実際の入金合計に反映し、該当日はレジの金庫現金からも控除する。
+export interface RecurringExpense {
+  id: string
+  item: string
+  amount: number                 // 円（＋収入/−支出。通常−）
+  cycle: 'monthly' | 'weekly'    // 周期
+  day: number                    // monthly: 1-31（日）／weekly: 0-6（0=日）
+  at: number
+}
+
 // ── レジ締め（日次） ─────────────────────────────
 export interface Closure {
   date: string       // YYYY-MM-DD（ドキュメントID）

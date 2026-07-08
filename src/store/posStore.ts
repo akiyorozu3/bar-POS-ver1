@@ -32,7 +32,7 @@ import { db, auth, COLLECTIONS } from '@/lib/firebase'
 import { idToEmail, emailToRole } from '@/lib/authConfig'
 import { calcBill, calcFee, DEFAULT_TAX_RATE } from '@/lib/tax'
 import { DEFAULT_MENUS } from '@/lib/defaultMenus'
-import type { Seat, OrderItem, MenuItem, Cast, Transaction, FeeSettings, PayMethod, Role, TaxMode, TaxSettings, Closure, Punch, Payout } from '@/types'
+import type { Seat, OrderItem, MenuItem, Cast, Transaction, FeeSettings, PayMethod, Role, TaxMode, TaxSettings, Closure, Punch, Payout, Expense, RecurringExpense } from '@/types'
 
 // 初期投入用のデフォルトキャスト（実データは Firestore で管理）
 export const DEFAULT_CASTS = ['さくら', 'あおい', 'ひなた', 'れいな']
@@ -148,6 +148,15 @@ interface PosState {
   addPayout: (castId: string, type: 'daily' | 'oiri', amount: number) => Promise<void>
   deletePayout: (id: string) => Promise<void>
 
+  expenses: Expense[]
+  recurringExpenses: RecurringExpense[]
+  subscribeExpenses: (from: Date, to: Date) => () => void
+  addExpense: (item: string, amount: number) => Promise<void>
+  deleteExpense: (id: string) => Promise<void>
+  subscribeRecurringExpenses: () => () => void
+  addRecurringExpense: (item: string, amount: number, cycle: 'monthly' | 'weekly', day: number) => Promise<void>
+  deleteRecurringExpense: (id: string) => Promise<void>
+
   subscribePunches: (from: Date, to: Date) => () => void
   addPunch: (castId: string, type: 'in' | 'out') => Promise<void>
   addPunchAt: (castId: string, type: 'in' | 'out', at: number) => Promise<void>
@@ -261,6 +270,8 @@ export const usePosStore = create<PosState>((set, get) => {
   closedDates: [],
   punches: [],
   payouts: [],
+  expenses: [],
+  recurringExpenses: [],
 
   // ── 認証 ─────────────────────────────────────
   initAuth: () => {
@@ -640,6 +651,58 @@ export const usePosStore = create<PosState>((set, get) => {
 
   deletePayout: async (id) => {
     await deleteDoc(doc(db, COLLECTIONS.PAYOUTS, id))
+  },
+
+  // ── 経費（単発） ──────────────────────────────
+  subscribeExpenses: (from, to) => {
+    const fromStr = dateStrOf(from.getTime())
+    const toStr = dateStrOf(to.getTime())
+    const q = query(
+      collection(db, COLLECTIONS.EXPENSES),
+      where('date', '>=', fromStr),
+      where('date', '<=', toStr),
+      orderBy('date', 'desc')
+    )
+    const unsub = onSnapshot(q, (snap) => {
+      set({ expenses: snap.docs.map((d) => ({ id: d.id, ...d.data() } as Expense)) })
+    }, () => { /* ルール未公開等は無視 */ })
+    return unsub
+  },
+
+  addExpense: async (item, amount) => {
+    await addDoc(collection(db, COLLECTIONS.EXPENSES), {
+      date: get().entryDate,
+      item,
+      amount,
+      at: Date.now(),
+    })
+  },
+
+  deleteExpense: async (id) => {
+    await deleteDoc(doc(db, COLLECTIONS.EXPENSES, id))
+  },
+
+  // ── 固定費（定期） ────────────────────────────
+  subscribeRecurringExpenses: () => {
+    const q = query(collection(db, COLLECTIONS.RECURRING_EXPENSES), orderBy('at'))
+    const unsub = onSnapshot(q, (snap) => {
+      set({ recurringExpenses: snap.docs.map((d) => ({ id: d.id, ...d.data() } as RecurringExpense)) })
+    }, () => { /* ルール未公開等は無視 */ })
+    return unsub
+  },
+
+  addRecurringExpense: async (item, amount, cycle, day) => {
+    await addDoc(collection(db, COLLECTIONS.RECURRING_EXPENSES), {
+      item,
+      amount,
+      cycle,
+      day,
+      at: Date.now(),
+    })
+  },
+
+  deleteRecurringExpense: async (id) => {
+    await deleteDoc(doc(db, COLLECTIONS.RECURRING_EXPENSES, id))
   },
 
   // ── 打刻 ──────────────────────────────────────

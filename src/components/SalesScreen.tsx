@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { usePosStore, todayStr, dateStrOf, businessDayStart, businessDayEnd } from '@/store/posStore'
-import type { Transaction } from '@/types'
+import type { Transaction, RecurringExpense } from '@/types'
 import { useSalesSummary } from '@/hooks/useSalesSummary'
 import { buildTransactionCSV, buildCastCSV, downloadCSV } from '@/lib/csv'
 import { castLabel } from '@/lib/cast'
@@ -46,7 +46,8 @@ function periodRange(period: Period, entryDate: string): [Date, Date] {
 }
 
 export default function SalesScreen() {
-  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, saveBackRate, taxRate, taxMode, saveTaxSettings, seats, orders, closedDates, closeDay, reopenDay, entryDate, casts, payouts, subscribePayouts, addPayout, deletePayout, deleteTransaction, restoreTransaction } = usePosStore()
+  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, saveBackRate, taxRate, taxMode, saveTaxSettings, seats, orders, closedDates, closeDay, reopenDay, entryDate, casts, payouts, subscribePayouts, addPayout, deletePayout, deleteTransaction, restoreTransaction, role, expenses, recurringExpenses, subscribeExpenses, addExpense, deleteExpense, subscribeRecurringExpenses, addRecurringExpense, deleteRecurringExpense } = usePosStore()
+  const isOwner = role === 'owner'
   const [period, setPeriod] = useState<Period>('today')
   const [showFeePanel, setShowFeePanel] = useState(false)
   const [showSyncPanel, setShowSyncPanel] = useState(false)
@@ -57,6 +58,16 @@ export default function SalesScreen() {
   const [payoutCast, setPayoutCast] = useState('')
   const [payoutAmount, setPayoutAmount] = useState('')
   const [payoutType, setPayoutType] = useState<'daily' | 'oiri'>('daily')
+  // 経費
+  const [showExpensePanel, setShowExpensePanel] = useState(false)
+  const [expItem, setExpItem] = useState('')
+  const [expAmount, setExpAmount] = useState('')      // 支出は正の数で入力（内部で−にする）
+  const [expSign, setExpSign] = useState<'out' | 'in'>('out') // out=支出(−) / in=収入(＋)
+  const [recItem, setRecItem] = useState('')
+  const [recAmount, setRecAmount] = useState('')
+  const [recSign, setRecSign] = useState<'out' | 'in'>('out')
+  const [recCycle, setRecCycle] = useState<'monthly' | 'weekly'>('monthly')
+  const [recDay, setRecDay] = useState('1')
   const [closing, setClosing] = useState(false)
   const [cardFee, setCardFee] = useState(String(feeSettings.card))
   const [qrFee, setQrFee] = useState(String(feeSettings.qr))
@@ -71,8 +82,10 @@ export default function SalesScreen() {
     const [from, to] = periodRange(period, entryDate)
     const u1 = subscribeTransactions(from, to)
     const u2 = subscribePayouts(from, to)
-    return () => { u1(); u2() }
-  }, [period, entryDate, subscribeTransactions, subscribePayouts])
+    const u3 = subscribeExpenses(from, to)
+    const u4 = subscribeRecurringExpenses()
+    return () => { u1(); u2(); u3(); u4() }
+  }, [period, entryDate, subscribeTransactions, subscribePayouts, subscribeExpenses, subscribeRecurringExpenses])
 
   const summary = useSalesSummary(transactions)
 
@@ -93,13 +106,57 @@ export default function SalesScreen() {
   const dayPayouts = payouts.filter((p) => p.date === closeDate)
   const dailyPayTotal = dayPayouts.filter((p) => p.type === 'daily').reduce((a, p) => a + p.amount, 0)
   const oiriTotal = dayPayouts.filter((p) => p.type === 'oiri').reduce((a, p) => a + p.amount, 0)
-  const safeCash = summary.byMethod.cash.sales - dailyPayTotal - oiriTotal
+
+  // 経費：金額は符号込み（＋収入 / −支出）。実際の入金合計に反映。
+  const [pFrom, pTo] = periodRange(period, entryDate)
+  const fromStr = dateStrOf(pFrom.getTime())
+  const toStr = dateStrOf(pTo.getTime())
+  const recurringOccurrences = (rec: RecurringExpense): number => {
+    let count = 0
+    const end = new Date(`${toStr}T12:00:00`)
+    for (const d = new Date(`${fromStr}T12:00:00`); d <= end; d.setDate(d.getDate() + 1)) {
+      if (rec.cycle === 'monthly' ? d.getDate() === rec.day : d.getDay() === rec.day) count++
+    }
+    return count
+  }
+  const oneoffExpenseTotal = expenses.reduce((a, e) => a + e.amount, 0)
+  const recurringExpenseTotal = recurringExpenses.reduce((a, r) => a + r.amount * recurringOccurrences(r), 0)
+  const expenseTotal = oneoffExpenseTotal + recurringExpenseTotal   // 符号込み
+  // 金庫現金：全て現金前提。ヘッダー日の単発経費＋その日に該当する固定費を反映。
+  const dayOneoff = expenses.filter((e) => e.date === closeDate).reduce((a, e) => a + e.amount, 0)
+  const closeD = new Date(`${closeDate}T12:00:00`)
+  const dayRecurring = recurringExpenses.reduce((a, r) => {
+    const hit = r.cycle === 'monthly' ? closeD.getDate() === r.day : closeD.getDay() === r.day
+    return a + (hit ? r.amount : 0)
+  }, 0)
+  const dayExpense = dayOneoff + dayRecurring
+
+  const safeCash = summary.byMethod.cash.sales - dailyPayTotal - oiriTotal + dayExpense
+  // 実際の入金合計（実入金 − 日払い/大入 ＋ 経費符号込み）
+  const netAfterAll = summary.totalNet - periodPayoutTotal + expenseTotal
 
   const handleAddPayout = async () => {
     const amt = Math.abs(parseInt(payoutAmount, 10))
     if (!payoutCast || !Number.isFinite(amt) || amt === 0) return
     await addPayout(payoutCast, payoutType, amt)
     setPayoutAmount('')
+  }
+
+  const handleAddExpense = async () => {
+    const raw = Math.abs(parseInt(expAmount, 10))
+    if (!expItem.trim() || !Number.isFinite(raw) || raw === 0) return
+    const signed = expSign === 'out' ? -raw : raw
+    await addExpense(expItem.trim(), signed)
+    setExpItem(''); setExpAmount('')
+  }
+
+  const handleAddRecurring = async () => {
+    const raw = Math.abs(parseInt(recAmount, 10))
+    const day = parseInt(recDay, 10)
+    if (!recItem.trim() || !Number.isFinite(raw) || raw === 0 || !Number.isFinite(day)) return
+    const signed = recSign === 'out' ? -raw : raw
+    await addRecurringExpense(recItem.trim(), signed, recCycle, day)
+    setRecItem(''); setRecAmount('')
   }
 
   // 完了した会計の編集/削除
@@ -204,6 +261,14 @@ export default function SalesScreen() {
         >
           <i className="ti ti-cash-banknote" aria-hidden /> 日払い/大入
         </button>
+        {isOwner && (
+          <button
+            className={`top-action-btn ${showExpensePanel ? 'active-s' : ''}`}
+            onClick={() => setShowExpensePanel((v) => !v)}
+          >
+            <i className="ti ti-notes" aria-hidden /> 経費
+          </button>
+        )}
         <button
           className={`top-action-btn ${showClosePanel ? 'active-s' : ''} ${dateClosed ? 'closed' : ''}`}
           onClick={() => { setPeriod('today'); setShowClosePanel((v) => !v) }}
@@ -289,6 +354,85 @@ export default function SalesScreen() {
           </div>
         )}
 
+        {/* 経費パネル（オーナー） */}
+        {showExpensePanel && isOwner && (
+          <div className="fee-settings">
+            <div className="fee-settings-title">
+              <i className="ti ti-notes" aria-hidden /> 経費（{periodLabel}）
+            </div>
+
+            {/* 単発の経費 */}
+            <div className="mm-add-row" style={{ marginBottom: 6 }}>
+              <input className="mm-add-name" placeholder="品目（例：おしぼり代）" value={expItem} onChange={(e) => setExpItem(e.target.value)} />
+              <select className="mm-add-cat" value={expSign} onChange={(e) => setExpSign(e.target.value as 'out' | 'in')}>
+                <option value="out">支出 −</option>
+                <option value="in">収入 ＋</option>
+              </select>
+              <input className="mm-add-price" type="number" min="0" placeholder="金額" value={expAmount} onChange={(e) => setExpAmount(e.target.value)} />
+              <button className="mm-add-btn" onClick={handleAddExpense} disabled={!expItem.trim() || !expAmount}>＋ 追加</button>
+            </div>
+            <div className="mm-note" style={{ padding: '0 2px 6px' }}>全て現金前提です（実際の入金合計と金庫現金の両方に反映）。＋追加は {closeDate.replace(/-/g, '/')} に記録されます</div>
+            {expenses.length === 0 ? (
+              <div className="mm-empty" style={{ padding: 10 }}>{periodLabel}の経費はありません</div>
+            ) : expenses.map((e) => (
+              <div className="close-row" key={e.id}>
+                <span>
+                  {period !== 'today' && <span className="payout-date">{e.date.slice(5).replace('-', '/')}</span>}
+                  {e.item}
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className={e.amount < 0 ? 'fee-amt' : 'net-amt'}>{e.amount < 0 ? '−' : '＋'}¥{Math.abs(e.amount).toLocaleString()}</span>
+                  <button className="mm-row-del" onClick={() => deleteExpense(e.id)}>削除</button>
+                </span>
+              </div>
+            ))}
+
+            {/* 固定費（定期） */}
+            <div className="fee-settings-title" style={{ marginTop: 12 }}>
+              <i className="ti ti-repeat" aria-hidden /> 固定費（定期）
+            </div>
+            <div className="mm-note" style={{ padding: '0 2px 6px' }}>登録すると毎月/毎週その分が自動で反映されます（該当日はレジの金庫現金からも控除）。</div>
+            <div className="mm-add-row" style={{ marginBottom: 6, flexWrap: 'wrap' }}>
+              <input className="mm-add-name" placeholder="品目（例：家賃）" value={recItem} onChange={(e) => setRecItem(e.target.value)} />
+              <select className="mm-add-cat" value={recSign} onChange={(e) => setRecSign(e.target.value as 'out' | 'in')}>
+                <option value="out">支出 −</option>
+                <option value="in">収入 ＋</option>
+              </select>
+              <input className="mm-add-price" type="number" min="0" placeholder="金額" value={recAmount} onChange={(e) => setRecAmount(e.target.value)} />
+              <select className="mm-add-cat" value={recCycle} onChange={(e) => setRecCycle(e.target.value as 'monthly' | 'weekly')}>
+                <option value="monthly">毎月</option>
+                <option value="weekly">毎週</option>
+              </select>
+              {recCycle === 'monthly' ? (
+                <span className="rec-day-wrap"><input className="rec-day-input" type="number" min="1" max="31" value={recDay} onChange={(e) => setRecDay(e.target.value)} />日</span>
+              ) : (
+                <select className="mm-add-cat" value={recDay} onChange={(e) => setRecDay(e.target.value)}>
+                  {['日', '月', '火', '水', '木', '金', '土'].map((w, i) => <option key={i} value={String(i)}>{w}曜</option>)}
+                </select>
+              )}
+              <button className="mm-add-btn" onClick={handleAddRecurring} disabled={!recItem.trim() || !recAmount}>＋ 追加</button>
+            </div>
+            {recurringExpenses.map((r) => (
+              <div className="close-row" key={r.id}>
+                <span>
+                  {r.item}
+                  <span className="payout-date">{r.cycle === 'monthly' ? `毎月${r.day}日` : `毎週${['日', '月', '火', '水', '木', '金', '土'][r.day]}曜`}</span>
+                  <span className="exp-tag">{periodLabel}{recurringOccurrences(r)}回</span>
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className={r.amount < 0 ? 'fee-amt' : 'net-amt'}>{r.amount < 0 ? '−' : '＋'}¥{Math.abs(r.amount).toLocaleString()}</span>
+                  <button className="mm-row-del" onClick={() => deleteRecurringExpense(r.id)}>削除</button>
+                </span>
+              </div>
+            ))}
+
+            <div className="close-row total" style={{ marginTop: 8 }}>
+              <span>経費合計（{periodLabel}・実際の入金合計に反映）</span>
+              <span className={expenseTotal < 0 ? 'fee-amt' : 'net-amt'}>{expenseTotal < 0 ? '−' : '＋'}¥{Math.abs(expenseTotal).toLocaleString()}</span>
+            </div>
+          </div>
+        )}
+
         {/* レジ締めパネル */}
         {showClosePanel && (
           <div className="fee-settings">
@@ -320,7 +464,10 @@ export default function SalesScreen() {
                     <div className="close-row"><span>大入</span><span className="fee-amt">−¥{oiriTotal.toLocaleString()}</span></div>
                   </>
                 )}
-                <div className="close-row total"><span>金庫に残る現金（現金 − 日払い − 大入）</span><span>¥{safeCash.toLocaleString()}</span></div>
+                {dayExpense !== 0 && (
+                  <div className="close-row"><span>経費（固定費含む）</span><span className={dayExpense < 0 ? 'fee-amt' : 'net-amt'}>{dayExpense < 0 ? '−' : '＋'}¥{Math.abs(dayExpense).toLocaleString()}</span></div>
+                )}
+                <div className="close-row total"><span>金庫に残る現金（現金 − 日払い − 大入{dayExpense !== 0 ? ' ± 経費' : ''}）</span><span>¥{safeCash.toLocaleString()}</span></div>
                 <button className="modal-btn ok" style={{ marginTop: 8, width: '100%' }} onClick={handleClose} disabled={closing}>
                   {closeDate.replace(/-/g, '/')} を締める
                 </button>
@@ -425,11 +572,14 @@ export default function SalesScreen() {
           </div>
           <div className="stat-card hl">
             <div className="stat-lbl">実際の入金合計</div>
-            <div className="stat-val">¥{(summary.totalNet - periodPayoutTotal).toLocaleString()}</div>
+            <div className="stat-val">¥{netAfterAll.toLocaleString()}</div>
             <div className="stat-sub">
-              {periodPayoutTotal > 0
-                ? `一人客 ${summary.soloCount}件 ／ 日払い・大入 −¥${periodPayoutTotal.toLocaleString()}`
-                : `一人客 ${summary.soloCount}件`}
+              {(() => {
+                const parts = [`一人客 ${summary.soloCount}件`]
+                if (periodPayoutTotal > 0) parts.push(`日払い・大入 −¥${periodPayoutTotal.toLocaleString()}`)
+                if (expenseTotal !== 0) parts.push(`経費 ${expenseTotal < 0 ? '−' : '＋'}¥${Math.abs(expenseTotal).toLocaleString()}`)
+                return parts.join(' ／ ')
+              })()}
             </div>
           </div>
         </div>

@@ -235,6 +235,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .method-qr { background: #faeeda; color: #854f0b; }
 .method-split { background: #ede7f6; color: #5a3a9e; }
 .payout-date { font-size: 9px; color: #888780; margin: 0 4px; }
+.exp-tag { font-size: 9px; background: #f2efe9; color: #888780; border-radius: 4px; padding: 1px 5px; margin-left: 6px; }
+.rec-day-wrap { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: #5f5e5a; }
+.rec-day-input { width: 48px; padding: 6px; border-radius: 6px; border: 0.5px solid #ccc; font-size: 12px; text-align: right; font-family: inherit; }
 .pay-bar-wrap { background: #f8f7f4; border: 0.5px solid #e0ddd5; border-radius: 8px; padding: 10px 12px; }
 .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .bar-lbl { font-size: 11px; color: #5f5e5a; width: 54px; }
