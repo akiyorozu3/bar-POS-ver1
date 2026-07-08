@@ -54,6 +54,16 @@ export interface MenuItem {
 // ── 支払い方法 ───────────────────────────────────
 export type PayMethod = 'cash' | 'card' | 'qr'
 
+// ── 分割支払いの内訳 ─────────────────────────────
+// 1会計で複数の支払い方法を混在させる場合の内訳（例：現金＋カード）。
+// 単一支払いのときは Transaction.payments を持たない。
+export interface PaymentSplit {
+  method: PayMethod
+  amount: number     // この方法での税込支払い額
+  feeRate: number    // 決済手数料率（%）
+  feeAmount: number  // 手数料額
+}
+
 // ── ユーザー権限 ─────────────────────────────────
 export type Role = 'owner' | 'staff'
 
@@ -74,10 +84,11 @@ export interface Transaction {
   subtotal: number     // 税抜合計
   tax: number
   total: number        // 税込合計
-  payMethod: PayMethod
-  feeRate: number      // 決済手数料率（%）
-  feeAmount: number    // 手数料額
-  netAmount: number    // 実入金額
+  payMethod: PayMethod  // 単一支払いの方法／分割時は最大金額の方法（表示のフォールバック用）
+  feeRate: number      // 決済手数料率（%）／分割時は代表（最大金額）の率
+  feeAmount: number    // 手数料額（分割時は内訳の合計）
+  netAmount: number    // 実入金額（total − feeAmount）
+  payments?: PaymentSplit[]  // 分割支払いの内訳（現金＋カード等）。単一支払いのときは無し
   primaryCast: string   // 売上が最も多いキャスト（CSV表示用）
   tableCasts: string[]  // 卓バックの受取キャスト（卓の担当。複数なら頭割り）
   completedAt: number   // 会計時刻（Unix ミリ秒）

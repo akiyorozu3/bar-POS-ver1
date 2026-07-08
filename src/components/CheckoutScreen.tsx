@@ -36,28 +36,52 @@ export default function CheckoutScreen({ onBack }: Props) {
   const [payMethod, setPayMethod] = useState<PayMethod>('cash')
   const [cashReceived, setCashReceived] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
+  // 分割支払い（1会計で現金＋カード等を混在）
+  const [split, setSplit] = useState(false)
+  const [splitCard, setSplitCard] = useState<number | null>(null)
+  const [splitQr, setSplitQr] = useState<number | null>(null)
 
   // 現在の卓に明細が無ければ、未会計の卓を自動で選ぶ
   useEffect(() => {
     if (items.length === 0 && unpaidSeats.length > 0) setCurrentSeat(unpaidSeats[0].id)
   }, [items.length, unpaidIds, unpaidSeats, setCurrentSeat])
 
-  // 卓を切り替えたらお預かり金額をリセット
-  useEffect(() => { setCashReceived(null) }, [currentSeatId])
+  // 卓を切り替えたらお預かり金額・分割入力をリセット
+  useEffect(() => { setCashReceived(null); setSplit(false); setSplitCard(null); setSplitQr(null) }, [currentSeatId])
 
   const feeRate = payMethod === 'card' ? feeSettings.card : payMethod === 'qr' ? feeSettings.qr : 0
   const feeAmt = calcFee(totalAmt, feeRate)
   const netAmt = totalAmt - feeAmt
 
   const change = cashReceived != null ? cashReceived - totalAmt : null
-  const canConfirm =
-    payMethod !== 'cash' || (cashReceived != null && cashReceived >= totalAmt)
+
+  // 分割支払いの計算：カード・QRを入力し、現金は残り。手数料はカード/QR分のみ。
+  const splitCardAmt = split ? (splitCard ?? 0) : 0
+  const splitQrAmt = split ? (splitQr ?? 0) : 0
+  const splitCashAmt = totalAmt - splitCardAmt - splitQrAmt
+  const splitFeeAmt = calcFee(splitCardAmt, feeSettings.card) + calcFee(splitQrAmt, feeSettings.qr)
+  const splitNetAmt = totalAmt - splitFeeAmt
+  const splitValid = splitCashAmt >= 0 && splitCardAmt >= 0 && splitQrAmt >= 0 && (splitCardAmt + splitQrAmt) > 0
+
+  const canConfirm = split
+    ? splitValid
+    : payMethod !== 'cash' || (cashReceived != null && cashReceived >= totalAmt)
 
   const handleConfirm = async () => {
     if (!currentSeatId || !canConfirm || dayClosed) return
     setLoading(true)
     try {
-      await completePayment(currentSeatId, payMethod, cashReceived ?? undefined)
+      if (split) {
+        const parts = [
+          { method: 'cash' as PayMethod, amount: splitCashAmt },
+          { method: 'card' as PayMethod, amount: splitCardAmt },
+          { method: 'qr' as PayMethod, amount: splitQrAmt },
+        ].filter((p) => p.amount > 0)
+        const dominant = [...parts].sort((a, b) => b.amount - a.amount)[0].method
+        await completePayment(currentSeatId, dominant, undefined, parts.length > 1 ? parts : undefined)
+      } else {
+        await completePayment(currentSeatId, payMethod, cashReceived ?? undefined)
+      }
       onBack()
     } catch (e) {
       alert((e as Error)?.message ?? '会計に失敗しました')
@@ -132,7 +156,17 @@ export default function CheckoutScreen({ onBack }: Props) {
 
         {/* 右：支払い */}
         <div className="co-right">
-          <div className="pay-label">支払い方法</div>
+          <div className="pay-label">
+            支払い方法
+            <button
+              className={`split-toggle ${split ? 'on' : ''}`}
+              onClick={() => { setSplit((v) => !v); setCashReceived(null) }}
+            >
+              {split ? '✓ 支払いを分ける' : '支払いを分ける'}
+            </button>
+          </div>
+          {!split && (
+          <>
           <div className="pay-methods">
             {PAY_DEFS.map((pd) => (
               <button
@@ -204,6 +238,67 @@ export default function CheckoutScreen({ onBack }: Props) {
                 <span className="fee-info-lbl">実際の入金額</span>
                 <span className="fee-info-val">¥{netAmt.toLocaleString()}</span>
               </div>
+            </div>
+          )}
+          </>
+          )}
+
+          {split && (
+            <div className="split-pay">
+              <div className="split-hint">カード・QRの金額を入力すると、残りが自動で現金になります。</div>
+              <div className="split-row">
+                <span className="split-lbl"><i className="ti ti-credit-card" aria-hidden /> カード</span>
+                <input
+                  className="split-input"
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  placeholder="0"
+                  value={splitCard ?? ''}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value, 10)
+                    setSplitCard(e.target.value === '' || Number.isNaN(n) ? null : n)
+                  }}
+                />
+              </div>
+              <div className="split-row">
+                <span className="split-lbl"><i className="ti ti-device-mobile" aria-hidden /> QR払い</span>
+                <input
+                  className="split-input"
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  placeholder="0"
+                  value={splitQr ?? ''}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value, 10)
+                    setSplitQr(e.target.value === '' || Number.isNaN(n) ? null : n)
+                  }}
+                />
+              </div>
+              <div className="split-row cash">
+                <span className="split-lbl"><i className="ti ti-cash" aria-hidden /> 現金（残り）</span>
+                <span className={`split-cash-val ${splitCashAmt < 0 ? 'danger' : ''}`}>¥{splitCashAmt.toLocaleString()}</span>
+              </div>
+              {splitCashAmt < 0 && (
+                <div className="split-warn">カード＋QRが合計を超えています。</div>
+              )}
+              {isOwner && splitFeeAmt > 0 && (
+                <div className="fee-info">
+                  <div className="fee-info-row">
+                    <span className="fee-info-lbl">売上金額</span>
+                    <span className="fee-info-val">¥{totalAmt.toLocaleString()}</span>
+                  </div>
+                  <div className="fee-info-row">
+                    <span className="fee-info-lbl">決済手数料</span>
+                    <span className="fee-info-val danger">−¥{splitFeeAmt.toLocaleString()}</span>
+                  </div>
+                  <div className="fee-info-row net">
+                    <span className="fee-info-lbl">実際の入金額</span>
+                    <span className="fee-info-val">¥{splitNetAmt.toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

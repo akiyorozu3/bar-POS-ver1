@@ -13,6 +13,9 @@ const PAY_COLOR: Record<PayMethod, string> = { cash: '#1D9E75', card: '#378ADD',
 const PAY_METHOD_CLS: Record<PayMethod, string> = {
   cash: 'method-cash', card: 'method-card', qr: 'method-qr',
 }
+// 一覧バッジ用：分割支払いは「分割」表示にまとめる
+const txPayLabel = (t: Transaction) => (t.payments?.length ? '分割' : PAY_LABEL[t.payMethod])
+const txPayCls = (t: Transaction) => (t.payments?.length ? 'method-split' : PAY_METHOD_CLS[t.payMethod])
 
 // 滞在時間（ミリ秒 → 「2時間15分」）。0以下は空文字
 function fmtDur(ms: number): string {
@@ -225,7 +228,7 @@ export default function SalesScreen() {
                 <div className={`tx-row ${txClosed(t) ? 'closed' : ''}`} key={t.id}>
                   <span className="tx-time">{new Date(t.completedAt).toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                   <span className="tx-seat">{t.seatName}</span>
-                  <span className={`method ${PAY_METHOD_CLS[t.payMethod]}`}>{PAY_LABEL[t.payMethod]}</span>
+                  <span className={`method ${txPayCls(t)}`}>{txPayLabel(t)}</span>
                   <span className="tx-total">¥{t.total.toLocaleString()}</span>
                   <span className="tx-actions">
                     <button className="tx-btn" onClick={() => setViewTx(t)}>閲覧</button>
@@ -512,13 +515,26 @@ export default function SalesScreen() {
             </div>
             <div className="close-row"><span>小計</span><span>¥{viewTx.subtotal.toLocaleString()}</span></div>
             {viewTx.tax > 0 && <div className="close-row"><span>消費税</span><span>¥{viewTx.tax.toLocaleString()}</span></div>}
-            <div className="close-row total"><span>合計（{PAY_LABEL[viewTx.payMethod]}）</span><span>¥{viewTx.total.toLocaleString()}</span></div>
-            {viewTx.feeAmount > 0 && (
+            <div className="close-row total"><span>合計（{txPayLabel(viewTx)}）</span><span>¥{viewTx.total.toLocaleString()}</span></div>
+            {viewTx.payments?.length ? (
+              <>
+                {viewTx.payments.map((p, i) => (
+                  <div className="close-row" key={i}>
+                    <span>{PAY_LABEL[p.method]}{p.feeRate > 0 ? `（手数料${p.feeRate}%）` : ''}</span>
+                    <span>¥{p.amount.toLocaleString()}{p.feeAmount > 0 ? ` → ¥${(p.amount - p.feeAmount).toLocaleString()}` : ''}</span>
+                  </div>
+                ))}
+                {viewTx.feeAmount > 0 && (
+                  <div className="close-row"><span>手数料合計</span><span className="fee-amt">−¥{viewTx.feeAmount.toLocaleString()}</span></div>
+                )}
+                <div className="close-row"><span>実入金額</span><span className="net-amt">¥{viewTx.netAmount.toLocaleString()}</span></div>
+              </>
+            ) : viewTx.feeAmount > 0 ? (
               <>
                 <div className="close-row"><span>決済手数料（{viewTx.feeRate}%）</span><span className="fee-amt">−¥{viewTx.feeAmount.toLocaleString()}</span></div>
                 <div className="close-row"><span>実入金額</span><span className="net-amt">¥{viewTx.netAmount.toLocaleString()}</span></div>
               </>
-            )}
+            ) : null}
             {viewTx.tableCasts?.length > 0 && (
               <div className="close-row"><span>卓の担当</span><span>{viewTx.tableCasts.join('・')}</span></div>
             )}

@@ -125,12 +125,14 @@ interface PosState {
   addOrderItem: (seatId: string, item: Omit<OrderItem, 'id'>) => void
   changeQty: (seatId: string, itemId: string, delta: number) => void
   changeItemCast: (seatId: string, itemId: string, cast: string) => void
+  changeItemDrinkBack: (seatId: string, itemId: string, drinkBack: number) => void
   clearOrder: (seatId: string) => void
 
   completePayment: (
     seatId: string,
     payMethod: PayMethod,
-    cashReceived?: number
+    cashReceived?: number,
+    splits?: { method: PayMethod; amount: number }[]
   ) => Promise<void>
 
   deleteTransaction: (id: string) => Promise<void>
@@ -440,13 +442,27 @@ export const usePosStore = create<PosState>((set, get) => {
     persistTable(seatId)
   },
 
+  // キャストドリンクのバック額（円/杯）をその場で上書き。
+  // 会計時に明細ごと取引へ焼き付くので非遡及（メニュー変更の影響を受けない）。
+  changeItemDrinkBack: (seatId, itemId, drinkBack) => {
+    set((s) => ({
+      orders: {
+        ...s.orders,
+        [seatId]: (s.orders[seatId] ?? []).map((x) =>
+          x.id === itemId ? { ...x, drinkBack } : x
+        ),
+      },
+    }))
+    persistTable(seatId)
+  },
+
   clearOrder: (seatId) => {
     set((s) => ({ orders: { ...s.orders, [seatId]: [] } }))
     persistTable(seatId)
   },
 
   // ── 会計確定 → Firestore書き込み ─────────────
-  completePayment: async (seatId, payMethod, _cashReceived) => {
+  completePayment: async (seatId, payMethod, _cashReceived, splits) => {
     const { seats, orders, feeSettings, taxRate, taxMode, entryDate, closedDates } = get()
     // 締め済みの日付には記録できない
     if (closedDates.includes(entryDate)) {
@@ -461,10 +477,33 @@ export const usePosStore = create<PosState>((set, get) => {
     const base = items.reduce((sum, x) => sum + x.priceExTax * x.qty, 0)
     const { subtotal, tax, total } = calcBill(base, taxRate, taxMode)
 
-    const feeRate =
-      payMethod === 'card' ? feeSettings.card :
-      payMethod === 'qr'   ? feeSettings.qr   : 0
-    const feeAmount = calcFee(total, feeRate)
+    const feeRateOf = (m: PayMethod) =>
+      m === 'card' ? feeSettings.card : m === 'qr' ? feeSettings.qr : 0
+
+    // 分割支払い（現金＋カード等）の内訳を組み立てる。金額0は除外。
+    const parts = (splits ?? []).filter((p) => p.amount > 0)
+    let payments: Transaction['payments']
+    let payMethodFinal = payMethod
+    let feeRate: number
+    let feeAmount: number
+
+    if (parts.length > 1) {
+      payments = parts.map((p) => {
+        const fr = feeRateOf(p.method)
+        return { method: p.method, amount: p.amount, feeRate: fr, feeAmount: calcFee(p.amount, fr) }
+      })
+      feeAmount = payments.reduce((s, p) => s + p.feeAmount, 0)
+      // 代表の支払い方法＝最も金額が大きい内訳（一覧バッジ等のフォールバック用）
+      const top = [...payments].sort((a, b) => b.amount - a.amount)[0]
+      payMethodFinal = top.method
+      feeRate = top.feeRate
+    } else {
+      // 単一支払い（分割トグルOFF、または内訳が実質1種類）
+      const m = parts.length === 1 ? parts[0].method : payMethod
+      payMethodFinal = m
+      feeRate = feeRateOf(m)
+      feeAmount = calcFee(total, feeRate)
+    }
     const netAmount = total - feeAmount
 
     // 卓の担当キャスト（空を除く。卓バックの頭割り対象）
@@ -487,10 +526,11 @@ export const usePosStore = create<PosState>((set, get) => {
       subtotal,
       tax,
       total,
-      payMethod,
+      payMethod: payMethodFinal,
       feeRate,
       feeAmount,
       netAmount,
+      ...(payments ? { payments } : {}),
       primaryCast,
       tableCasts,
       completedAt: entryDateToTs(entryDate),

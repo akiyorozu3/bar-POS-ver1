@@ -11,7 +11,7 @@ export default function OrderScreen() {
   const {
     seats, currentSeatId, orders,
     addSeat, updateSeat, setCurrentSeat,
-    menus, casts, removeSeat, addOrderItem, changeQty, changeItemCast, clearOrder, setTableCasts,
+    menus, casts, removeSeat, addOrderItem, changeQty, changeItemCast, changeItemDrinkBack, clearOrder, setTableCasts,
     taxRate, taxMode, tableNames, role,
   } = usePosStore()
   const isOwner = role === 'owner'
@@ -326,6 +326,25 @@ export default function OrderScreen() {
                         <option value="">未設定</option>
                         {casts.map((c) => <option key={c.id}>{castLabel(c)}</option>)}
                       </select>
+                      {role === 'owner' && (
+                        <span className="t-back-wrap">
+                          <span className="t-back-lbl">バック</span>
+                          <input
+                            className="t-back-input"
+                            type="number"
+                            inputMode="numeric"
+                            min="0"
+                            placeholder="0"
+                            value={item.drinkBack ?? ''}
+                            onChange={(e) => {
+                              if (!currentSeatId) return
+                              const n = parseInt(e.target.value, 10)
+                              changeItemDrinkBack(currentSeatId, item.id, e.target.value === '' || Number.isNaN(n) ? 0 : n)
+                            }}
+                          />
+                          <span className="t-back-unit">円/杯</span>
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>

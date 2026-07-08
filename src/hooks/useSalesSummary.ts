@@ -32,11 +32,22 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
       totalFee += t.feeAmount
       if (t.solo) soloCount++
 
-      const m = byMethod[t.payMethod]
-      m.count++
-      m.sales += t.total
-      m.fee += t.feeAmount
-      m.net += t.netAmount
+      // 支払い方法別の集計。分割支払いは内訳（payments）を各方法へ振り分ける。
+      if (t.payments && t.payments.length) {
+        for (const p of t.payments) {
+          const m = byMethod[p.method]
+          m.count++
+          m.sales += p.amount
+          m.fee += p.feeAmount
+          m.net += p.amount - p.feeAmount
+        }
+      } else {
+        const m = byMethod[t.payMethod]
+        m.count++
+        m.sales += t.total
+        m.fee += t.feeAmount
+        m.net += t.netAmount
+      }
 
       // ① 卓バック：合計 × 卓バック率 を、卓の担当キャストで頭割り
       const tableCasts = (t.tableCasts ?? []).filter(Boolean)

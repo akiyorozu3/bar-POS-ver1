@@ -89,6 +89,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .t-cast-row { display: flex; align-items: center; gap: 4px; }
 .t-cast-lbl { font-size: 9px; color: #888780; }
 .t-cast-sel { font-size: 9px; border: 0.5px solid #e0ddd5; border-radius: 4px; padding: 1px 4px; background: #fff; color: #888780; font-family: inherit; cursor: pointer; }
+.t-back-wrap { display: flex; align-items: center; gap: 3px; margin-left: auto; }
+.t-back-lbl { font-size: 9px; color: #888780; }
+.t-back-input { width: 64px; font-size: 9px; border: 0.5px solid #e0ddd5; border-radius: 4px; padding: 1px 4px; background: #fff; color: #1a1a18; font-family: inherit; text-align: right; }
+.t-back-unit { font-size: 9px; color: #888780; }
 .fullback-toggle { font-size: 9px; padding: 1px 6px; border-radius: 8px; border: 0.5px solid #e0ddd5; background: #fff; color: #888780; font-family: inherit; cursor: pointer; white-space: nowrap; margin-left: auto; }
 .fullback-toggle.on { background: #faeeda; color: #854f0b; border-color: #ba7517; font-weight: 500; }
 .ticket-foot { padding: 7px 10px; border-top: 0.5px solid #e0ddd5; background: #f8f7f4; }
@@ -123,7 +127,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .co-total-lbl { font-size: 13px; font-weight: 500; }
 .co-total-val { font-size: 20px; font-weight: 500; }
 .co-right { display: flex; flex-direction: column; padding: 10px 12px; gap: 8px; overflow-y: auto; }
-.pay-label { font-size: 10px; color: #888780; text-transform: uppercase; letter-spacing: .06em; }
+.pay-label { font-size: 10px; color: #888780; text-transform: uppercase; letter-spacing: .06em; display: flex; align-items: center; justify-content: space-between; }
+.split-toggle { font-size: 10px; padding: 3px 8px; border-radius: 999px; border: 0.5px solid #ccc; background: #f8f7f4; color: #5f5e5a; cursor: pointer; font-family: inherit; text-transform: none; letter-spacing: 0; }
+.split-toggle.on { background: #e6f1fb; border-color: #378add; color: #185fa5; font-weight: 600; }
+.split-pay { display: flex; flex-direction: column; gap: 6px; }
+.split-hint { font-size: 10px; color: #888780; line-height: 1.5; }
+.split-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.split-lbl { font-size: 11px; color: #1a1a18; display: flex; align-items: center; gap: 6px; }
+.split-lbl i { font-size: 15px; color: #888780; }
+.split-input { width: 120px; padding: 7px 9px; border-radius: 8px; border: 0.5px solid #ccc; font-size: 13px; text-align: right; font-family: inherit; }
+.split-row.cash { padding-top: 2px; border-top: 0.5px solid #eee; }
+.split-cash-val { font-size: 14px; font-weight: 700; color: #1a1a18; }
+.split-cash-val.danger { color: #a32d2d; }
+.split-warn { font-size: 10px; color: #a32d2d; }
 .pay-methods { display: flex; flex-direction: column; gap: 4px; }
 .pay-btn { padding: 8px 10px; border-radius: 8px; border: 0.5px solid #ccc; background: #f8f7f4; color: #1a1a18; font-size: 11px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-family: inherit; }
 .pay-btn.selected { background: #e6f1fb; border-color: #378add; color: #185fa5; }
@@ -217,6 +233,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .method-cash { background: #eaf3de; color: #3b6d11; }
 .method-card { background: #e6f1fb; color: #185fa5; }
 .method-qr { background: #faeeda; color: #854f0b; }
+.method-split { background: #ede7f6; color: #5a3a9e; }
 .pay-bar-wrap { background: #f8f7f4; border: 0.5px solid #e0ddd5; border-radius: 8px; padding: 10px 12px; }
 .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .bar-lbl { font-size: 11px; color: #5f5e5a; width: 54px; }

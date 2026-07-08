@@ -18,7 +18,8 @@ export default function MenuManageScreen() {
 
   const isDrink = category === 'キャストドリンク'
   const priceNum = parseInt(price, 10)
-  const canAdd = name.trim().length > 0 && Number.isFinite(priceNum) && priceNum > 0
+  // 価格0を許可（バック額だけ設定する「◯◯給与」等の0円キャスドリ用）
+  const canAdd = name.trim().length > 0 && Number.isFinite(priceNum) && priceNum >= 0
 
   const handleAdd = async () => {
     if (!canAdd) return
@@ -163,7 +164,7 @@ function MenuRow({ menu }: { menu: MenuItem }) {
   const backChanged = isDrink && drinkBack.trim() !== backStr0
   const backValid = drinkBack.trim() === '' || (Number.isFinite(backNum) && backNum >= 0)
   const dirty = name.trim() !== menu.name || (Number.isFinite(priceNum) && priceNum !== menu.priceExTax) || backChanged
-  const valid = name.trim().length > 0 && Number.isFinite(priceNum) && priceNum > 0 && backValid
+  const valid = name.trim().length > 0 && Number.isFinite(priceNum) && priceNum >= 0 && backValid
 
   const handleSave = async () => {
     if (!dirty || !valid) return

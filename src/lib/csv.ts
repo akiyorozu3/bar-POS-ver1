@@ -26,7 +26,9 @@ export function buildTransactionCSV(transactions: Transaction[]): string {
     new Date(t.completedAt).toLocaleString('ja-JP'),
     t.seatName,
     t.solo ? '○' : '',
-    PAY_LABEL[t.payMethod] ?? t.payMethod,
+    t.payments?.length
+      ? '分割（' + t.payments.map((p) => `${PAY_LABEL[p.method] ?? p.method}¥${p.amount.toLocaleString()}`).join('／') + '）'
+      : PAY_LABEL[t.payMethod] ?? t.payMethod,
     t.subtotal,
     t.tax,
     t.total,
