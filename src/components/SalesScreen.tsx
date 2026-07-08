@@ -83,7 +83,13 @@ export default function SalesScreen() {
   const unpaidCount = seats.filter((s) => (orders[s.id]?.length ?? 0) > 0).length
   const totalBack = summary.castSummaries.reduce((a, c) => a + c.backAmount, 0)
 
-  // 日払い/大入（ヘッダー日付の分）
+  // 日払い/大入（選択期間の分。payouts は購読範囲＝選択期間そのもの）
+  const periodDailyPay = payouts.filter((p) => p.type === 'daily').reduce((a, p) => a + p.amount, 0)
+  const periodOiri = payouts.filter((p) => p.type === 'oiri').reduce((a, p) => a + p.amount, 0)
+  const periodPayoutTotal = periodDailyPay + periodOiri
+  const periodLabel = { today: '今日', week: '今週', month: '今月' }[period]
+
+  // 日払い/大入（ヘッダー日付の分。レジ締めは1営業日単位のため日別で使う）
   const dayPayouts = payouts.filter((p) => p.date === closeDate)
   const dailyPayTotal = dayPayouts.filter((p) => p.type === 'daily').reduce((a, p) => a + p.amount, 0)
   const oiriTotal = dayPayouts.filter((p) => p.type === 'oiri').reduce((a, p) => a + p.amount, 0)
@@ -246,7 +252,7 @@ export default function SalesScreen() {
         {showPayoutPanel && (
           <div className="fee-settings">
             <div className="fee-settings-title">
-              <i className="ti ti-cash-banknote" aria-hidden /> 日払い/大入（{closeDate.replace(/-/g, '/')}）
+              <i className="ti ti-cash-banknote" aria-hidden /> 日払い/大入（{periodLabel}）
             </div>
             <div className="mm-add-row" style={{ marginBottom: 8 }}>
               <select className="mm-add-cat" value={payoutType} onChange={(e) => setPayoutType(e.target.value as 'daily' | 'oiri')}>
@@ -260,12 +266,14 @@ export default function SalesScreen() {
               <input className="mm-add-price" type="number" min="0" placeholder="金額" value={payoutAmount} onChange={(e) => setPayoutAmount(e.target.value)} />
               <button className="mm-add-btn" onClick={handleAddPayout} disabled={!payoutCast || !payoutAmount}>＋ 追加</button>
             </div>
-            {dayPayouts.length === 0 ? (
-              <div className="mm-empty" style={{ padding: 12 }}>この日の日払い/大入はありません</div>
-            ) : dayPayouts.map((p) => (
+            <div className="mm-note" style={{ padding: '0 2px 6px' }}>＋追加は {closeDate.replace(/-/g, '/')} に記録されます</div>
+            {payouts.length === 0 ? (
+              <div className="mm-empty" style={{ padding: 12 }}>{periodLabel}の日払い/大入はありません</div>
+            ) : payouts.map((p) => (
               <div className="close-row" key={p.id}>
                 <span>
                   <span className={`method ${p.type === 'daily' ? 'method-card' : 'method-qr'}`}>{p.type === 'daily' ? '日払い' : '大入'}</span>
+                  {period !== 'today' && <span className="payout-date">{p.date.slice(5).replace('-', '/')}</span>}
                   {' '}{p.name || p.realName}
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -275,8 +283,8 @@ export default function SalesScreen() {
               </div>
             ))}
             <div className="close-row total">
-              <span>日払い ¥{dailyPayTotal.toLocaleString()} ／ 大入 ¥{oiriTotal.toLocaleString()}</span>
-              <span className="fee-amt">−¥{(dailyPayTotal + oiriTotal).toLocaleString()}</span>
+              <span>日払い ¥{periodDailyPay.toLocaleString()} ／ 大入 ¥{periodOiri.toLocaleString()}</span>
+              <span className="fee-amt">−¥{periodPayoutTotal.toLocaleString()}</span>
             </div>
           </div>
         )}
@@ -417,8 +425,12 @@ export default function SalesScreen() {
           </div>
           <div className="stat-card hl">
             <div className="stat-lbl">実際の入金合計</div>
-            <div className="stat-val">¥{summary.totalNet.toLocaleString()}</div>
-            <div className="stat-sub">一人客 {summary.soloCount}件</div>
+            <div className="stat-val">¥{(summary.totalNet - periodPayoutTotal).toLocaleString()}</div>
+            <div className="stat-sub">
+              {periodPayoutTotal > 0
+                ? `一人客 ${summary.soloCount}件 ／ 日払い・大入 −¥${periodPayoutTotal.toLocaleString()}`
+                : `一人客 ${summary.soloCount}件`}
+            </div>
           </div>
         </div>
 
