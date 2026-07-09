@@ -60,6 +60,7 @@ async function main() {
   console.log('サンプルデータ投入中（テスト環境 bar-pos-staging）...')
   console.log('- アカウント')
   await ensureUser('owner', 'password')
+  await ensureUser('manager', '1carat123')
   await ensureUser('staff', '000000')
 
   await signInWithEmailAndPassword(auth, `owner@${DOMAIN}`, 'password')

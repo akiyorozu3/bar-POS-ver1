@@ -243,12 +243,16 @@ export default function SalesScreen() {
             {{ today: '今日', week: '今週', month: '今月' }[p]}
           </button>
         ))}
-        <button className={`top-action-btn ${showFeePanel ? 'active-s' : ''}`} onClick={() => setShowFeePanel((v) => !v)}>
-          <i className="ti ti-settings" aria-hidden /> 手数料/バック
-        </button>
-        <button className={`top-action-btn ${showSyncPanel ? 'active-s' : ''}`} onClick={() => setShowSyncPanel((v) => !v)}>
-          <i className="ti ti-cloud" aria-hidden /> 連携
-        </button>
+        {isOwner && (
+          <button className={`top-action-btn ${showFeePanel ? 'active-s' : ''}`} onClick={() => setShowFeePanel((v) => !v)}>
+            <i className="ti ti-settings" aria-hidden /> 手数料/バック
+          </button>
+        )}
+        {isOwner && (
+          <button className={`top-action-btn ${showSyncPanel ? 'active-s' : ''}`} onClick={() => setShowSyncPanel((v) => !v)}>
+            <i className="ti ti-cloud" aria-hidden /> 連携
+          </button>
+        )}
         <button
           className={`top-action-btn ${showTxPanel ? 'active-s' : ''}`}
           onClick={() => setShowTxPanel((v) => !v)}
@@ -261,28 +265,30 @@ export default function SalesScreen() {
         >
           <i className="ti ti-cash-banknote" aria-hidden /> 日払い/大入
         </button>
+        <button
+          className={`top-action-btn ${showExpensePanel ? 'active-s' : ''}`}
+          onClick={() => setShowExpensePanel((v) => !v)}
+        >
+          <i className="ti ti-notes" aria-hidden /> 経費
+        </button>
         {isOwner && (
           <button
-            className={`top-action-btn ${showExpensePanel ? 'active-s' : ''}`}
-            onClick={() => setShowExpensePanel((v) => !v)}
+            className={`top-action-btn ${showClosePanel ? 'active-s' : ''} ${dateClosed ? 'closed' : ''}`}
+            onClick={() => { setPeriod('today'); setShowClosePanel((v) => !v) }}
           >
-            <i className="ti ti-notes" aria-hidden /> 経費
+            <i className="ti ti-lock" aria-hidden /> レジ締め{dateClosed ? '済' : ''}
           </button>
         )}
-        <button
-          className={`top-action-btn ${showClosePanel ? 'active-s' : ''} ${dateClosed ? 'closed' : ''}`}
-          onClick={() => { setPeriod('today'); setShowClosePanel((v) => !v) }}
-        >
-          <i className="ti ti-lock" aria-hidden /> レジ締め{dateClosed ? '済' : ''}
-        </button>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-          <button className="export-btn" onClick={handleExportTx}>
-            <i className="ti ti-download" aria-hidden /> 売上CSV
-          </button>
-          <button className="export-btn" onClick={handleExportCast}>
-            <i className="ti ti-download" aria-hidden /> バックCSV
-          </button>
-        </div>
+        {isOwner && (
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+            <button className="export-btn" onClick={handleExportTx}>
+              <i className="ti ti-download" aria-hidden /> 売上CSV
+            </button>
+            <button className="export-btn" onClick={handleExportCast}>
+              <i className="ti ti-download" aria-hidden /> バックCSV
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="sales-body">
@@ -303,13 +309,13 @@ export default function SalesScreen() {
                   <span className="tx-total">¥{t.total.toLocaleString()}</span>
                   <span className="tx-actions">
                     <button className="tx-btn" onClick={() => setViewTx(t)}>閲覧</button>
-                    <button className="tx-btn edit" onClick={() => handleEditTx(t)}>編集</button>
-                    <button className="tx-btn del" onClick={() => handleDeleteTx(t)}>削除</button>
+                    {isOwner && <button className="tx-btn edit" onClick={() => handleEditTx(t)}>編集</button>}
+                    {isOwner && <button className="tx-btn del" onClick={() => handleDeleteTx(t)}>削除</button>}
                   </span>
                 </div>
               ))}
             </div>
-            <div className="mm-note" style={{ paddingTop: 6 }}>※ 締め済みの日の会計は、締め解除してから編集/削除できます。</div>
+            {isOwner && <div className="mm-note" style={{ paddingTop: 6 }}>※ 締め済みの日の会計は、締め解除してから編集/削除できます。</div>}
           </div>
         )}
 
@@ -354,8 +360,8 @@ export default function SalesScreen() {
           </div>
         )}
 
-        {/* 経費パネル（オーナー） */}
-        {showExpensePanel && isOwner && (
+        {/* 経費パネル（オーナー・マネージャー） */}
+        {showExpensePanel && (
           <div className="fee-settings">
             <div className="fee-settings-title">
               <i className="ti ti-notes" aria-hidden /> 経費（{periodLabel}）
@@ -434,7 +440,7 @@ export default function SalesScreen() {
         )}
 
         {/* レジ締めパネル */}
-        {showClosePanel && (
+        {showClosePanel && isOwner && (
           <div className="fee-settings">
             <div className="fee-settings-title">
               <i className="ti ti-lock" aria-hidden /> レジ締め（{closeDate.replace(/-/g, '/')}{isBackdated ? '・遡及' : ''}）
@@ -477,7 +483,7 @@ export default function SalesScreen() {
         )}
 
         {/* 手数料設定パネル */}
-        {showFeePanel && (
+        {showFeePanel && isOwner && (
           <div className="fee-settings">
             <div className="fee-settings-title">
               <i className="ti ti-settings" aria-hidden /> 手数料・バック率・消費税の設定
@@ -545,7 +551,7 @@ export default function SalesScreen() {
         )}
 
         {/* Firebase連携説明 */}
-        {showSyncPanel && (
+        {showSyncPanel && isOwner && (
           <div className="sync-info">
             <div className="sync-info-title">
               <i className="ti ti-cloud" aria-hidden /> データ連携

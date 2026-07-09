@@ -45,6 +45,7 @@ async function main() {
 
   console.log('- アカウント')
   await ensureUser('owner', 'password')
+  await ensureUser('manager', '1carat123')
   await ensureUser('staff', '000000')
 
   // Firestore への書き込みはオーナー権限が要る（ルール準拠）ため owner でサインイン

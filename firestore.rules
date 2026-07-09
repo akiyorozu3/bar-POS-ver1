@@ -13,6 +13,17 @@ service cloud.firestore {
       return isAuthed() && request.auth.token.email == 'owner@bar-pos.local';
     }
 
+    // マネージャーか（オーナーより弱く、スタッフより強い）
+    // ※ VITE_MANAGER_ID を変えた場合はここも合わせること
+    function isManager() {
+      return isAuthed() && request.auth.token.email == 'manager@bar-pos.local';
+    }
+
+    // 売上管理を見られる権限（オーナー or マネージャー）
+    function canSales() {
+      return isOwner() || isManager();
+    }
+
     // メニュー：ログイン済みは閲覧可 / 追加・編集・削除はオーナーのみ
     match /menus/{id} {
       allow read: if isAuthed();
@@ -42,17 +53,17 @@ service cloud.firestore {
       allow update, delete: if isOwner();
     }
 
-    // 日払い/大入：オーナーのみ（金庫・売上管理に関わる）
+    // 日払い/大入：オーナー・マネージャー（追加/削除まで可）
     match /payouts/{id} {
-      allow read, write: if isOwner();
+      allow read, write: if canSales();
     }
 
-    // 経費・固定費：オーナーのみ（売上管理・実入金に関わる）
+    // 経費・固定費：オーナー・マネージャー（追加/削除まで可）
     match /expenses/{id} {
-      allow read, write: if isOwner();
+      allow read, write: if canSales();
     }
     match /recurringExpenses/{id} {
-      allow read, write: if isOwner();
+      allow read, write: if canSales();
     }
 
     // 手数料設定：ログイン済みは閲覧可（会計計算に必要） / 変更はオーナーのみ
@@ -62,10 +73,11 @@ service cloud.firestore {
     }
 
     // 取引（売上）：スタッフは「会計の確定（作成）」のみ可能。
-    // 売上の閲覧・修正・削除はオーナーのみ（＝スタッフは過去売上を一切見られない）
+    // 閲覧はオーナー・マネージャー。修正・削除はオーナーのみ（マネージャーは閲覧専用）。
     match /transactions/{id} {
       allow create: if isAuthed();
-      allow read, update, delete: if isOwner();
+      allow read: if canSales();
+      allow update, delete: if isOwner();
     }
   }
 }

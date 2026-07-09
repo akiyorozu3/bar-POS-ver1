@@ -65,7 +65,8 @@ export interface PaymentSplit {
 }
 
 // ── ユーザー権限 ─────────────────────────────────
-export type Role = 'owner' | 'staff'
+// owner=全権 / manager=売上管理の閲覧＋日払い/大入・経費（取引明細は閲覧のみ）/ staff=注文・会計のみ
+export type Role = 'owner' | 'manager' | 'staff'
 
 // ── 税の扱い ─────────────────────────────────────
 // exclusive: 税抜で登録し会計時に加算 / inclusive: 税込で登録し加算しない

@@ -46,6 +46,7 @@ export default function App() {
   } = usePosStore()
 
   const isOwner = role === 'owner'
+  const canSales = role === 'owner' || role === 'manager'   // 売上管理を開ける権限
   const backdated = entryDate !== todayStr()
 
   // 認証状態の購読（初回マウント時）
@@ -74,8 +75,9 @@ export default function App() {
 
   // 権限が変わったら、許可されない画面からは注文入力に戻す
   useEffect(() => {
-    if (!isOwner && (screen === 'sales' || screen === 'menu' || screen === 'cast' || screen === 'punchmgr')) setScreen('order')
-  }, [isOwner, screen])
+    if (screen === 'sales' && !canSales) setScreen('order')
+    if ((screen === 'menu' || screen === 'cast' || screen === 'punchmgr') && !isOwner) setScreen('order')
+  }, [isOwner, canSales, screen])
 
   // 会計へ遷移イベント（OrderScreen から発火）
   useEffect(() => {
@@ -111,7 +113,7 @@ export default function App() {
       {/* トップバー（ユーザー情報・ログアウト） */}
       <div className={`topbar ${backdated ? 'backdated' : ''}`}>
         <span className="topbar-role">
-          {isOwner ? 'オーナー' : 'スタッフ'}
+          {role === 'owner' ? 'オーナー' : role === 'manager' ? 'マネージャー' : 'スタッフ'}
         </span>
         <label className="topbar-date">
           <span className="topbar-date-lbl">{backdated ? '遡及入力 ⚠' : '日付'}</span>
@@ -151,7 +153,7 @@ export default function App() {
         >
           <i className="ti ti-receipt" aria-hidden /> 会計
         </button>
-        {isOwner && (
+        {canSales && (
           <button
             className={`nav-btn ${screen === 'sales' ? 'active' : ''}`}
             onClick={() => setScreen('sales')}
@@ -191,7 +193,7 @@ export default function App() {
         {screen === 'checkout' && (
           <CheckoutScreen onBack={() => setScreen('order')} />
         )}
-        {screen === 'sales' && isOwner && <SalesScreen />}
+        {screen === 'sales' && canSales && <SalesScreen />}
         {screen === 'menu' && isOwner && <MenuManageScreen />}
         {screen === 'cast' && isOwner && <CastManageScreen />}
         {screen === 'punchmgr' && isOwner && <PunchManageScreen />}
