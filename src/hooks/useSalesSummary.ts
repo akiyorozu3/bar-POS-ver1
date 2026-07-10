@@ -13,7 +13,14 @@ const DRINK_CATEGORY = 'キャストドリンク'
 export function useSalesSummary(transactions: Transaction[]): SalesSummary {
   const backRate = usePosStore((s) => s.backRate)            // 卓バック率
   const drinkBackRate = usePosStore((s) => s.drinkBackRate)  // ドリンクバック率
+  const menus = usePosStore((s) => s.menus)                  // 保険用：現行メニューの円バック参照
   return useMemo(() => {
+    // 保険：明細に円バックが焼き付いていない場合、現行メニューの円バックを商品名で引く。
+    // （端末が古い等で焼き付け漏れが起きても、ドリンクバックが0円にならないようにする）
+    const menuDrinkBack = new Map<string, number>()
+    for (const m of menus) {
+      if (m.category === DRINK_CATEGORY && m.drinkBack != null) menuDrinkBack.set(m.name, m.drinkBack)
+    }
     const byMethod = Object.fromEntries(
       PAY_METHODS.map((m) => [m, { count: 0, sales: 0, fee: 0, net: 0 }])
     ) as SalesSummary['byMethod']
@@ -75,7 +82,13 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
         const amt = item.priceExTax * item.qty
         const e = ensure(c)
         if (c !== UNASSIGNED) {
-          const back = item.drinkBack != null ? item.drinkBack * item.qty : amt * drinkBackRate
+          // ① 焼き付け済みの円バック → その額（非遡及を維持）
+          // ② 未焼き付け → 現行メニューの円バック（保険）
+          // ③ それも無ければ → 旧仕様の率
+          const back =
+            item.drinkBack != null ? item.drinkBack * item.qty :
+            menuDrinkBack.has(item.name) ? (menuDrinkBack.get(item.name) as number) * item.qty :
+            amt * drinkBackRate
           e.backRaw += back
         }
         // ドリンク分の売上も可視化（卓担当の卓売上とは別計上）
@@ -109,5 +122,5 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
       castSummaries,
       transactions,
     }
-  }, [transactions, backRate, drinkBackRate])
+  }, [transactions, backRate, drinkBackRate, menus])
 }
