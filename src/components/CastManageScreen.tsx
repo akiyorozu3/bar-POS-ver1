@@ -7,6 +7,7 @@ export default function CastManageScreen() {
 
   const [name, setName] = useState('')
   const [realName, setRealName] = useState('')
+  const [wage, setWage] = useState('')
   const [busy, setBusy] = useState(false)
 
   // ニックネーム・本名のどちらか一方が入っていればOK
@@ -16,9 +17,11 @@ export default function CastManageScreen() {
     if (!canAdd) return
     setBusy(true)
     try {
-      await addCast(name.trim(), realName.trim())
+      const w = parseInt(wage, 10)
+      await addCast(name.trim(), realName.trim(), Number.isFinite(w) && w >= 0 ? w : undefined)
       setName('')
       setRealName('')
+      setWage('')
     } finally {
       setBusy(false)
     }
@@ -59,6 +62,18 @@ export default function CastManageScreen() {
               onChange={(e) => setRealName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleAdd() }}
             />
+            <span className="cast-wage-wrap">
+              <input
+                className="cast-wage-input"
+                type="number"
+                min="0"
+                placeholder="時給"
+                value={wage}
+                onChange={(e) => setWage(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleAdd() }}
+              />
+              <span className="cast-wage-unit">円/h</span>
+            </span>
             <button className="mm-add-btn" onClick={handleAdd} disabled={!canAdd || busy}>＋ 追加</button>
           </div>
         </div>
@@ -89,16 +104,20 @@ function CastRow({ cast }: { cast: Cast }) {
   const { updateCast, deleteCast } = usePosStore()
   const [name, setName] = useState(cast.name)
   const [realName, setRealName] = useState(cast.realName ?? '')
+  const [wage, setWage] = useState(cast.hourlyWage != null ? String(cast.hourlyWage) : '')
   const [busy, setBusy] = useState(false)
 
-  const dirty = name.trim() !== cast.name || realName.trim() !== (cast.realName ?? '')
+  const wageNum = parseInt(wage, 10)
+  const wageVal = wage.trim() === '' ? undefined : (Number.isFinite(wageNum) && wageNum >= 0 ? wageNum : undefined)
+  const wageChanged = wageVal !== (cast.hourlyWage ?? undefined)
+  const dirty = name.trim() !== cast.name || realName.trim() !== (cast.realName ?? '') || wageChanged
   const valid = name.trim().length > 0 || realName.trim().length > 0
 
   const handleSave = async () => {
     if (!dirty || !valid) return
     setBusy(true)
     try {
-      await updateCast(cast.id, { name: name.trim(), realName: realName.trim() })
+      await updateCast(cast.id, { name: name.trim(), realName: realName.trim(), hourlyWage: wageVal ?? 0 })
     } finally {
       setBusy(false)
     }
@@ -118,6 +137,10 @@ function CastRow({ cast }: { cast: Cast }) {
     <div className="mm-row">
       <input className="mm-row-name" placeholder="ニックネーム" value={name} onChange={(e) => setName(e.target.value)} />
       <input className="mm-row-name" placeholder="本名" value={realName} onChange={(e) => setRealName(e.target.value)} />
+      <span className="cast-wage-wrap">
+        <input className="cast-wage-input" type="number" min="0" placeholder="時給" value={wage} onChange={(e) => setWage(e.target.value)} />
+        <span className="cast-wage-unit">円/h</span>
+      </span>
       <button className="mm-row-save" onClick={handleSave} disabled={!dirty || !valid || busy}>保存</button>
       <button className="mm-row-del" onClick={handleDelete} disabled={busy}>削除</button>
     </div>

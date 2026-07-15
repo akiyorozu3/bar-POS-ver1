@@ -238,6 +238,33 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .exp-tag { font-size: 9px; background: #f2efe9; color: #888780; border-radius: 4px; padding: 1px 5px; margin-left: 6px; }
 .rec-day-wrap { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: #5f5e5a; }
 .rec-day-input { width: 48px; padding: 6px; border-radius: 6px; border: 0.5px solid #ccc; font-size: 12px; text-align: right; font-family: inherit; }
+
+/* キャスト時給入力 */
+.cast-wage-wrap { display: inline-flex; align-items: center; gap: 3px; }
+.cast-wage-input { width: 70px; padding: 7px 8px; border-radius: 8px; border: 0.5px solid #ccc; font-size: 12px; text-align: right; font-family: inherit; }
+.cast-wage-unit { font-size: 10px; color: #888780; }
+
+/* 純利益パネル */
+.profit-modes { display: flex; gap: 6px; margin-bottom: 8px; }
+.profit-mode { font-size: 12px; padding: 5px 14px; border-radius: 999px; border: 0.5px solid #ccc; background: #f8f7f4; color: #5f5e5a; cursor: pointer; font-family: inherit; }
+.profit-mode.active { background: #1d9e75; border-color: #1d9e75; color: #fff; font-weight: 700; }
+.profit-summary { background: #f2f8f5; border: 0.5px solid #cfe6da; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+.profit-summary-lbl { font-size: 10px; color: #4a7a63; }
+.profit-summary-val { font-size: 24px; font-weight: 800; color: #157a5a; letter-spacing: .01em; }
+.profit-summary-val.minus { color: #a32d2d; }
+.profit-summary-sub { font-size: 10px; color: #6f8a7d; line-height: 1.6; margin-top: 2px; }
+.profit-table-wrap { overflow-x: auto; }
+.profit-table { min-width: 620px; }
+.profit-head, .profit-row { display: grid; grid-template-columns: 56px repeat(7, minmax(64px, 1fr)); gap: 4px; align-items: center; padding: 5px 4px; }
+.profit-head { font-size: 9px; color: #888780; border-bottom: 0.5px solid #e0ddd5; position: sticky; top: 0; }
+.profit-head span, .profit-row span { text-align: right; }
+.profit-head span:first-child, .profit-row .profit-key { text-align: left; }
+.profit-row { font-size: 11px; color: #1a1a18; border-bottom: 0.5px solid #f0ede7; }
+.profit-row .minus { color: #a32d2d; }
+.profit-row .muted { color: #aaa7a0; }
+.profit-key { font-weight: 600; }
+.profit-val { font-weight: 800; color: #157a5a; }
+.profit-val.minus { color: #a32d2d; }
 .pay-bar-wrap { background: #f8f7f4; border: 0.5px solid #e0ddd5; border-radius: 8px; padding: 10px 12px; }
 .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .bar-lbl { font-size: 11px; color: #5f5e5a; width: 54px; }

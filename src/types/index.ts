@@ -25,6 +25,7 @@ export interface Cast {
   id: string
   name: string        // ニックネーム（源氏名。店内表示に使う）
   realName?: string   // 本名（給与・CSV用）
+  hourlyWage?: number // 時給（円/時）。人件費＝時給×勤務時間。未設定は0扱い
   sortOrder: number
 }
 

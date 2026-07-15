@@ -4,6 +4,9 @@ import type { Transaction, RecurringExpense } from '@/types'
 import { useSalesSummary } from '@/hooks/useSalesSummary'
 import { buildTransactionCSV, buildCastCSV, downloadCSV } from '@/lib/csv'
 import { castLabel } from '@/lib/cast'
+import { buildShifts } from '@/lib/punch'
+import { computeProfit } from '@/lib/profit'
+import { useProfitData } from '@/hooks/useProfitData'
 import type { PayMethod } from '@/types'
 
 type Period = 'today' | 'week' | 'month'
@@ -46,7 +49,7 @@ function periodRange(period: Period, entryDate: string): [Date, Date] {
 }
 
 export default function SalesScreen() {
-  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, saveBackRate, taxRate, taxMode, saveTaxSettings, seats, orders, closedDates, closeDay, reopenDay, entryDate, casts, payouts, subscribePayouts, addPayout, deletePayout, deleteTransaction, restoreTransaction, role, expenses, recurringExpenses, subscribeExpenses, addExpense, deleteExpense, subscribeRecurringExpenses, addRecurringExpense, deleteRecurringExpense } = usePosStore()
+  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, saveBackRate, taxRate, taxMode, saveTaxSettings, seats, orders, closedDates, closeDay, reopenDay, entryDate, casts, payouts, subscribePayouts, addPayout, deletePayout, deleteTransaction, restoreTransaction, role, expenses, recurringExpenses, subscribeExpenses, addExpense, deleteExpense, subscribeRecurringExpenses, addRecurringExpense, deleteRecurringExpense, menus } = usePosStore()
   const isOwner = role === 'owner'
   const [period, setPeriod] = useState<Period>('today')
   const [showFeePanel, setShowFeePanel] = useState(false)
@@ -58,6 +61,9 @@ export default function SalesScreen() {
   const [payoutCast, setPayoutCast] = useState('')
   const [payoutAmount, setPayoutAmount] = useState('')
   const [payoutType, setPayoutType] = useState<'daily' | 'oiri'>('daily')
+  // 純利益
+  const [showProfitPanel, setShowProfitPanel] = useState(false)
+  const [profitMode, setProfitMode] = useState<'day' | 'month'>('day')
   // 経費
   const [showExpensePanel, setShowExpensePanel] = useState(false)
   const [expItem, setExpItem] = useState('')
@@ -134,6 +140,16 @@ export default function SalesScreen() {
   const safeCash = summary.byMethod.cash.sales - dailyPayTotal - oiriTotal + dayExpense
   // 実際の入金合計（実入金 − 日払い/大入 ＋ 経費符号込み）
   const netAfterAll = summary.totalNet - periodPayoutTotal + expenseTotal
+
+  // 純利益（日別/月別）：期間トグルとは独立に直近6ヶ月を取得して月比較できるようにする
+  const pd = useProfitData(6, showProfitPanel)
+  const profit = computeProfit({
+    transactions: pd.transactions, payouts: pd.payouts, expenses: pd.expenses,
+    recurringExpenses: pd.recurringExpenses, shifts: buildShifts(pd.punches).shifts,
+    casts, menus, backRate, drinkBackRate, fromStr: pd.fromStr, toStr: pd.toStr,
+  })
+  const profitRows = profitMode === 'day' ? profit.days : profit.months
+  const thisMonthProfit = profit.months.find((m) => m.key === todayStr().slice(0, 7))
 
   const handleAddPayout = async () => {
     const amt = Math.abs(parseInt(payoutAmount, 10))
@@ -271,6 +287,14 @@ export default function SalesScreen() {
         >
           <i className="ti ti-notes" aria-hidden /> 経費
         </button>
+        {isOwner && (
+          <button
+            className={`top-action-btn ${showProfitPanel ? 'active-s' : ''}`}
+            onClick={() => setShowProfitPanel((v) => !v)}
+          >
+            <i className="ti ti-trending-up" aria-hidden /> 純利益
+          </button>
+        )}
         {isOwner && (
           <button
             className={`top-action-btn ${showClosePanel ? 'active-s' : ''} ${dateClosed ? 'closed' : ''}`}
@@ -435,6 +459,56 @@ export default function SalesScreen() {
             <div className="close-row total" style={{ marginTop: 8 }}>
               <span>経費合計（{periodLabel}・実際の入金合計に反映）</span>
               <span className={expenseTotal < 0 ? 'fee-amt' : 'net-amt'}>{expenseTotal < 0 ? '−' : '＋'}¥{Math.abs(expenseTotal).toLocaleString()}</span>
+            </div>
+          </div>
+        )}
+
+        {/* 純利益パネル（オーナー） */}
+        {showProfitPanel && isOwner && (
+          <div className="fee-settings">
+            <div className="fee-settings-title">
+              <i className="ti ti-trending-up" aria-hidden /> 純利益（直近6ヶ月）
+            </div>
+            <div className="profit-modes">
+              <button className={`profit-mode ${profitMode === 'day' ? 'active' : ''}`} onClick={() => setProfitMode('day')}>日別</button>
+              <button className={`profit-mode ${profitMode === 'month' ? 'active' : ''}`} onClick={() => setProfitMode('month')}>月別</button>
+            </div>
+
+            <div className="profit-summary">
+              <div className="profit-summary-lbl">今月の純利益</div>
+              <div className={`profit-summary-val ${(thisMonthProfit?.profit ?? 0) < 0 ? 'minus' : ''}`}>¥{(thisMonthProfit?.profit ?? 0).toLocaleString()}</div>
+              <div className="profit-summary-sub">
+                {thisMonthProfit
+                  ? `実入金 ¥${thisMonthProfit.sales.toLocaleString()} − 人件費 ¥${thisMonthProfit.labor.toLocaleString()} − バック ¥${thisMonthProfit.back.toLocaleString()} − 大入 ¥${thisMonthProfit.oiri.toLocaleString()}${thisMonthProfit.expense < 0 ? ' − 経費 ¥' + Math.abs(thisMonthProfit.expense).toLocaleString() : thisMonthProfit.expense > 0 ? ' ＋ 経費 ¥' + thisMonthProfit.expense.toLocaleString() : ''}`
+                  : '今月のデータはまだありません'}
+              </div>
+            </div>
+
+            <div className="profit-table-wrap">
+              <div className="profit-table">
+                <div className="profit-head">
+                  <span>{profitMode === 'day' ? '日付' : '月'}</span><span>売上</span><span>人件費</span><span>バック</span><span>大入</span><span>日払い</span><span>経費</span><span>純利益</span>
+                </div>
+                {pd.loading ? (
+                  <div className="mm-empty" style={{ padding: 12 }}>読み込み中...</div>
+                ) : profitRows.length === 0 ? (
+                  <div className="mm-empty" style={{ padding: 12 }}>データがありません</div>
+                ) : profitRows.map((r) => (
+                  <div className="profit-row" key={r.key}>
+                    <span className="profit-key">{profitMode === 'day' ? r.key.slice(5).replace('-', '/') : r.key.replace('-', '/')}</span>
+                    <span>¥{r.sales.toLocaleString()}</span>
+                    <span className="minus">{r.labor ? `−¥${r.labor.toLocaleString()}` : '—'}</span>
+                    <span className="minus">{r.back ? `−¥${r.back.toLocaleString()}` : '—'}</span>
+                    <span className="minus">{r.oiri ? `−¥${r.oiri.toLocaleString()}` : '—'}</span>
+                    <span className="muted">{r.dailyPay ? `(¥${r.dailyPay.toLocaleString()})` : '—'}</span>
+                    <span className={r.expense < 0 ? 'minus' : ''}>{r.expense ? `${r.expense < 0 ? '−' : '＋'}¥${Math.abs(r.expense).toLocaleString()}` : '—'}</span>
+                    <span className={`profit-val ${r.profit < 0 ? 'minus' : ''}`}>¥{r.profit.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="mm-note" style={{ paddingTop: 6 }}>
+              純利益＝実入金−人件費−バック−大入＋経費。日払いは人件費/バックの前払い分なので差し引かず参考表示（括弧）。人件費＝時給×打刻の勤務時間（退勤済みの分のみ）。時給は「キャスト管理」で登録。
             </div>
           </div>
         )}
