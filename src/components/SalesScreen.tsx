@@ -4,7 +4,7 @@ import type { Transaction, RecurringExpense } from '@/types'
 import { useSalesSummary } from '@/hooks/useSalesSummary'
 import { buildTransactionCSV, buildCastCSV, downloadCSV } from '@/lib/csv'
 import { castLabel } from '@/lib/cast'
-import { buildShifts } from '@/lib/punch'
+import { buildShifts, durationMin } from '@/lib/punch'
 import { computeProfit } from '@/lib/profit'
 import { useProfitData } from '@/hooks/useProfitData'
 import type { PayMethod } from '@/types'
@@ -49,7 +49,7 @@ function periodRange(period: Period, entryDate: string): [Date, Date] {
 }
 
 export default function SalesScreen() {
-  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, saveBackRate, taxRate, taxMode, saveTaxSettings, seats, orders, closedDates, closeDay, reopenDay, entryDate, casts, payouts, subscribePayouts, addPayout, deletePayout, deleteTransaction, restoreTransaction, role, expenses, recurringExpenses, subscribeExpenses, addExpense, deleteExpense, subscribeRecurringExpenses, addRecurringExpense, deleteRecurringExpense, menus } = usePosStore()
+  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, saveBackRate, taxRate, taxMode, saveTaxSettings, seats, orders, closedDates, closeDay, reopenDay, entryDate, casts, payouts, subscribePayouts, addPayout, deletePayout, deleteTransaction, restoreTransaction, role, expenses, recurringExpenses, subscribeExpenses, addExpense, deleteExpense, subscribeRecurringExpenses, addRecurringExpense, deleteRecurringExpense, menus, punches, subscribePunches } = usePosStore()
   const isOwner = role === 'owner'
   const [period, setPeriod] = useState<Period>('today')
   const [showFeePanel, setShowFeePanel] = useState(false)
@@ -90,8 +90,9 @@ export default function SalesScreen() {
     const u2 = subscribePayouts(from, to)
     const u3 = subscribeExpenses(from, to)
     const u4 = subscribeRecurringExpenses()
-    return () => { u1(); u2(); u3(); u4() }
-  }, [period, entryDate, subscribeTransactions, subscribePayouts, subscribeExpenses, subscribeRecurringExpenses])
+    const u5 = subscribePunches(from, to)
+    return () => { u1(); u2(); u3(); u4(); u5() }
+  }, [period, entryDate, subscribeTransactions, subscribePayouts, subscribeExpenses, subscribeRecurringExpenses, subscribePunches])
 
   const summary = useSalesSummary(transactions)
 
@@ -101,6 +102,19 @@ export default function SalesScreen() {
   const isBackdated = closeDate !== todayStr()
   const unpaidCount = seats.filter((s) => (orders[s.id]?.length ?? 0) > 0).length
   const totalBack = summary.castSummaries.reduce((a, c) => a + c.backAmount, 0)
+
+  // キャスト別の勤務時間・通算時給（人件費）を期間の打刻から集計。名前で突合。
+  const laborByName = new Map<string, { min: number; labor: number }>()
+  for (const s of buildShifts(punches).shifts) {
+    const m = durationMin(s.inAt, s.outAt)
+    if (m == null) continue
+    const wage = casts.find((c) => c.id === s.castId)?.hourlyWage ?? 0
+    const e = laborByName.get(s.name) ?? { min: 0, labor: 0 }
+    e.min += m
+    e.labor += wage * (m / 60)
+    laborByName.set(s.name, e)
+  }
+  const fmtWorkMin = (min: number) => `${Math.floor(min / 60)}h${String(min % 60).padStart(2, '0')}m`
 
   // 日払い/大入（選択期間の分。payouts は購読範囲＝選択期間そのもの）
   const periodDailyPay = payouts.filter((p) => p.type === 'daily').reduce((a, p) => a + p.amount, 0)
@@ -287,14 +301,12 @@ export default function SalesScreen() {
         >
           <i className="ti ti-notes" aria-hidden /> 経費
         </button>
-        {isOwner && (
-          <button
-            className={`top-action-btn ${showProfitPanel ? 'active-s' : ''}`}
-            onClick={() => setShowProfitPanel((v) => !v)}
-          >
-            <i className="ti ti-trending-up" aria-hidden /> 純利益
-          </button>
-        )}
+        <button
+          className={`top-action-btn ${showProfitPanel ? 'active-s' : ''}`}
+          onClick={() => setShowProfitPanel((v) => !v)}
+        >
+          <i className="ti ti-trending-up" aria-hidden /> 純利益
+        </button>
         {isOwner && (
           <button
             className={`top-action-btn ${showClosePanel ? 'active-s' : ''} ${dateClosed ? 'closed' : ''}`}
@@ -463,8 +475,8 @@ export default function SalesScreen() {
           </div>
         )}
 
-        {/* 純利益パネル（オーナー） */}
-        {showProfitPanel && isOwner && (
+        {/* 純利益パネル（オーナー・マネージャー） */}
+        {showProfitPanel && (
           <div className="fee-settings">
             <div className="fee-settings-title">
               <i className="ti ti-trending-up" aria-hidden /> 純利益（直近6ヶ月）
@@ -720,16 +732,21 @@ export default function SalesScreen() {
           <div className="section-title">キャストバック集計</div>
           <div className="cast-table">
             <div className="cast-head">
-              <span>キャスト</span><span>卓数</span><span>売上</span><span>バック</span>
+              <span>キャスト</span><span>卓数</span><span>売上</span><span>バック</span><span>勤務時間</span><span>通算時給</span>
             </div>
-            {summary.castSummaries.map((c) => (
-              <div key={c.name} className="cast-row-item">
-                <span>{c.name}</span>
-                <span>{c.txCount}件</span>
-                <span>¥{c.salesAmount.toLocaleString()}</span>
-                <span className="back-badge">¥{c.backAmount.toLocaleString()}</span>
-              </div>
-            ))}
+            {summary.castSummaries.map((c) => {
+              const w = laborByName.get(c.name)
+              return (
+                <div key={c.name} className="cast-row-item">
+                  <span>{c.name}</span>
+                  <span>{c.txCount}件</span>
+                  <span>¥{c.salesAmount.toLocaleString()}</span>
+                  <span className="back-badge">¥{c.backAmount.toLocaleString()}</span>
+                  <span>{w ? fmtWorkMin(w.min) : '—'}</span>
+                  <span>{w && w.labor > 0 ? `¥${Math.round(w.labor).toLocaleString()}` : '—'}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>

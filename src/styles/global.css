@@ -272,9 +272,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .bar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
 .bar-val { font-size: 11px; color: #1a1a18; min-width: 32px; text-align: right; }
 .cast-table { background: #f8f7f4; border: 0.5px solid #e0ddd5; border-radius: 8px; overflow: hidden; }
-.cast-head { display: grid; grid-template-columns: 1fr 50px 65px 70px; padding: 6px 10px; border-bottom: 0.5px solid #e0ddd5; background: #fff; }
+.cast-head { display: grid; grid-template-columns: 1fr 44px 64px 66px 58px 66px; padding: 6px 10px; border-bottom: 0.5px solid #e0ddd5; background: #fff; }
 .cast-head span { font-size: 10px; color: #888780; text-transform: uppercase; letter-spacing: .04em; }
-.cast-row-item { display: grid; grid-template-columns: 1fr 50px 65px 70px; padding: 7px 10px; border-bottom: 0.5px solid #e0ddd5; }
+.cast-row-item { display: grid; grid-template-columns: 1fr 44px 64px 66px 58px 66px; padding: 7px 10px; border-bottom: 0.5px solid #e0ddd5; }
 .cast-row-item:last-child { border-bottom: none; }
 .cast-row-item span { font-size: 11px; color: #1a1a18; }
 .back-badge { color: #3b6d11 !important; font-weight: 500; }
