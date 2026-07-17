@@ -48,6 +48,14 @@ export default function App() {
   const isOwner = role === 'owner'
   const canSales = role === 'owner' || role === 'manager'   // 売上管理を開ける権限
   const backdated = entryDate !== todayStr()
+  // ヘッダー日付を ±1日ずらす（未来日は不可）
+  const shiftEntryDate = (delta: number) => {
+    const d = new Date(`${entryDate}T12:00:00`)
+    d.setDate(d.getDate() + delta)
+    const s = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    if (s > todayStr()) return
+    setEntryDate(s)
+  }
 
   // 認証状態の購読（初回マウント時）
   useEffect(() => {
@@ -117,12 +125,16 @@ export default function App() {
         </span>
         <label className="topbar-date">
           <span className="topbar-date-lbl">{backdated ? '遡及入力 ⚠' : '日付'}</span>
-          <input
-            type="date"
-            value={entryDate}
-            max={todayStr()}
-            onChange={(e) => setEntryDate(e.target.value)}
-          />
+          <span className="topbar-date-nav">
+            <button className="date-step" onClick={() => shiftEntryDate(-1)} title="前の日" aria-label="前の日">‹</button>
+            <input
+              type="date"
+              value={entryDate}
+              max={todayStr()}
+              onChange={(e) => setEntryDate(e.target.value)}
+            />
+            <button className="date-step" onClick={() => shiftEntryDate(1)} disabled={!backdated} title="次の日" aria-label="次の日">›</button>
+          </span>
           {backdated && (
             <button className="topbar-date-today" onClick={() => setEntryDate(todayStr())}>今日に戻す</button>
           )}

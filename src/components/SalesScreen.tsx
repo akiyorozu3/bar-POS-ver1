@@ -9,7 +9,7 @@ import { computeProfit } from '@/lib/profit'
 import { useProfitData } from '@/hooks/useProfitData'
 import type { PayMethod } from '@/types'
 
-type Period = 'today' | 'week' | 'month'
+type Period = 'today' | 'week' | 'month' | 'custom'
 
 const PAY_LABEL: Record<PayMethod, string> = { cash: '現金', card: 'カード', qr: 'QR払い' }
 const PAY_COLOR: Record<PayMethod, string> = { cash: '#1D9E75', card: '#378ADD', qr: '#BA7517' }
@@ -52,6 +52,8 @@ export default function SalesScreen() {
   const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, saveBackRate, taxRate, taxMode, saveTaxSettings, seats, orders, closedDates, closeDay, reopenDay, entryDate, casts, payouts, subscribePayouts, addPayout, deletePayout, deleteTransaction, restoreTransaction, role, expenses, recurringExpenses, subscribeExpenses, addExpense, deleteExpense, subscribeRecurringExpenses, addRecurringExpense, deleteRecurringExpense, menus, punches, subscribePunches } = usePosStore()
   const isOwner = role === 'owner'
   const [period, setPeriod] = useState<Period>('today')
+  const [customFrom, setCustomFrom] = useState(todayStr())
+  const [customTo, setCustomTo] = useState(todayStr())
   const [showFeePanel, setShowFeePanel] = useState(false)
   const [showSyncPanel, setShowSyncPanel] = useState(false)
   const [showClosePanel, setShowClosePanel] = useState(false)
@@ -83,16 +85,29 @@ export default function SalesScreen() {
   const [taxModeLocal, setTaxModeLocal] = useState(taxMode)
   const [feeSaved, setFeeSaved] = useState(false)
 
+  // 期間の実範囲 [from, to]。custom は開始〜終了（前後してもOK）。
+  const isDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s)
+  const rangeOf = (): [Date, Date] => {
+    if (period === 'custom') {
+      const a = isDate(customFrom) ? customFrom : todayStr()
+      const b = isDate(customTo) ? customTo : todayStr()
+      const [lo, hi] = a <= b ? [a, b] : [b, a]
+      return [businessDayStart(lo), new Date(businessDayEnd(hi).getTime() - 1)]
+    }
+    return periodRange(period, entryDate)
+  }
+
   // 期間・入力日が変わるたびに購読し直す
   useEffect(() => {
-    const [from, to] = periodRange(period, entryDate)
+    const [from, to] = rangeOf()
     const u1 = subscribeTransactions(from, to)
     const u2 = subscribePayouts(from, to)
     const u3 = subscribeExpenses(from, to)
     const u4 = subscribeRecurringExpenses()
     const u5 = subscribePunches(from, to)
     return () => { u1(); u2(); u3(); u4(); u5() }
-  }, [period, entryDate, subscribeTransactions, subscribePayouts, subscribeExpenses, subscribeRecurringExpenses, subscribePunches])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period, entryDate, customFrom, customTo, subscribeTransactions, subscribePayouts, subscribeExpenses, subscribeRecurringExpenses, subscribePunches])
 
   const summary = useSalesSummary(transactions)
 
@@ -139,7 +154,9 @@ export default function SalesScreen() {
   const periodDailyPay = payouts.filter((p) => p.type === 'daily').reduce((a, p) => a + p.amount, 0)
   const periodOiri = payouts.filter((p) => p.type === 'oiri').reduce((a, p) => a + p.amount, 0)
   const periodPayoutTotal = periodDailyPay + periodOiri
-  const periodLabel = { today: '今日', week: '今週', month: '今月' }[period]
+  const periodLabel = period === 'custom'
+    ? `${customFrom.slice(5).replace('-', '/')}〜${customTo.slice(5).replace('-', '/')}`
+    : { today: '今日', week: '今週', month: '今月' }[period]
 
   // 日払い/大入（ヘッダー日付の分。レジ締めは1営業日単位のため日別で使う）
   const dayPayouts = payouts.filter((p) => p.date === closeDate)
@@ -147,7 +164,7 @@ export default function SalesScreen() {
   const oiriTotal = dayPayouts.filter((p) => p.type === 'oiri').reduce((a, p) => a + p.amount, 0)
 
   // 経費：金額は符号込み（＋収入 / −支出）。実際の入金合計に反映。
-  const [pFrom, pTo] = periodRange(period, entryDate)
+  const [pFrom, pTo] = rangeOf()
   const fromStr = dateStrOf(pFrom.getTime())
   const toStr = dateStrOf(pTo.getTime())
   const recurringOccurrences = (rec: RecurringExpense): number => {
@@ -273,7 +290,7 @@ export default function SalesScreen() {
 
   const handleExportTx = () => {
     const csv = buildTransactionCSV(transactions)
-    const label = { today: '今日', week: '今週', month: '今月' }[period]
+    const label = period === 'custom' ? `${customFrom}_${customTo}` : { today: '今日', week: '今週', month: '今月' }[period]
     downloadCSV(csv, `売上_${label}_${new Date().toLocaleDateString('ja-JP').replace(/\//g,'')}.csv`)
   }
 
@@ -289,9 +306,19 @@ export default function SalesScreen() {
       <div className="sales-top">
         {(['today', 'week', 'month'] as Period[]).map((p) => (
           <button key={p} className={`period-btn ${period === p ? 'active' : ''}`} onClick={() => setPeriod(p)}>
-            {{ today: '今日', week: '今週', month: '今月' }[p]}
+            {{ today: '今日', week: '今週', month: '今月', custom: '' }[p]}
           </button>
         ))}
+        <button className={`period-btn ${period === 'custom' ? 'active' : ''}`} onClick={() => setPeriod('custom')}>
+          期間指定
+        </button>
+        {period === 'custom' && (
+          <span className="custom-range">
+            <input type="date" className="custom-range-input" value={customFrom} max={todayStr()} onChange={(e) => setCustomFrom(e.target.value)} />
+            <span className="custom-range-sep">〜</span>
+            <input type="date" className="custom-range-input" value={customTo} max={todayStr()} onChange={(e) => setCustomTo(e.target.value)} />
+          </span>
+        )}
         {isOwner && (
           <button className={`top-action-btn ${showFeePanel ? 'active-s' : ''}`} onClick={() => setShowFeePanel((v) => !v)}>
             <i className="ti ti-settings" aria-hidden /> 手数料/バック
