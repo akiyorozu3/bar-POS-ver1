@@ -116,6 +116,25 @@ export default function SalesScreen() {
   }
   const fmtWorkMin = (min: number) => `${Math.floor(min / 60)}h${String(min % 60).padStart(2, '0')}m`
 
+  // キャスト別の大入・日払い（名前で突合）と、渡す残額＝通算時給＋バック＋大入−日払い
+  const payoutByName = new Map<string, { oiri: number; daily: number }>()
+  for (const p of payouts) {
+    const e = payoutByName.get(p.name) ?? { oiri: 0, daily: 0 }
+    if (p.type === 'oiri') e.oiri += p.amount
+    else e.daily += p.amount
+    payoutByName.set(p.name, e)
+  }
+  const castPayout = (name: string, back: number) => {
+    const w = laborByName.get(name)
+    const po = payoutByName.get(name)
+    return (w?.labor ?? 0) + back + (po?.oiri ?? 0) - (po?.daily ?? 0)
+  }
+  // 渡す残額の合計（全キャスト＝人件費合計＋バック合計＋大入合計−日払い合計）
+  const totalLabor = [...laborByName.values()].reduce((a, w) => a + w.labor, 0)
+  let totalOiri = 0, totalDaily = 0
+  for (const v of payoutByName.values()) { totalOiri += v.oiri; totalDaily += v.daily }
+  const totalPayout = totalLabor + totalBack + totalOiri - totalDaily
+
   // 日払い/大入（選択期間の分。payouts は購読範囲＝選択期間そのもの）
   const periodDailyPay = payouts.filter((p) => p.type === 'daily').reduce((a, p) => a + p.amount, 0)
   const periodOiri = payouts.filter((p) => p.type === 'oiri').reduce((a, p) => a + p.amount, 0)
@@ -732,10 +751,11 @@ export default function SalesScreen() {
           <div className="section-title">キャストバック集計</div>
           <div className="cast-table">
             <div className="cast-head">
-              <span>キャスト</span><span>卓数</span><span>売上</span><span>バック</span><span>勤務時間</span><span>通算時給</span>
+              <span>キャスト</span><span>卓数</span><span>売上</span><span>バック</span><span>勤務時間</span><span>通算時給</span><span>渡す残額</span>
             </div>
             {summary.castSummaries.map((c) => {
               const w = laborByName.get(c.name)
+              const pay = castPayout(c.name, c.backAmount)
               return (
                 <div key={c.name} className="cast-row-item">
                   <span>{c.name}</span>
@@ -744,9 +764,20 @@ export default function SalesScreen() {
                   <span className="back-badge">¥{c.backAmount.toLocaleString()}</span>
                   <span>{w ? fmtWorkMin(w.min) : '—'}</span>
                   <span>{w && w.labor > 0 ? `¥${Math.round(w.labor).toLocaleString()}` : '—'}</span>
+                  <span className="payout-cell">¥{Math.round(pay).toLocaleString()}</span>
                 </div>
               )
             })}
+            <div className="cast-row-item cast-total">
+              <span>合計</span><span></span><span></span>
+              <span className="back-badge">¥{totalBack.toLocaleString()}</span>
+              <span></span>
+              <span>¥{Math.round(totalLabor).toLocaleString()}</span>
+              <span className="payout-cell">¥{Math.round(totalPayout).toLocaleString()}</span>
+            </div>
+          </div>
+          <div className="mm-note" style={{ paddingTop: 6 }}>
+            渡す残額＝通算時給＋バック＋大入−日払い（すでに渡した日払いを差し引いた、まだ渡す必要のある額）。大入・日払いはキャスト名で突合。
           </div>
         </div>
       </div>
