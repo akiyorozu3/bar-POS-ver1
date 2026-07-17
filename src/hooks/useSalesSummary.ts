@@ -64,8 +64,11 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
         u.salesAmount += t.total
         u.txCount++
       } else {
+        // 卓バックは会計の税込合計が「会計時に焼き付けた最低会計額」以上のときだけ発生。
+        // 過去取引には焼き付けが無い（=0）ので遡及しない。売上は条件に関わらず計上。
+        const overThreshold = t.total >= (t.backThreshold ?? 0)
         const shareSales = t.total / tableCasts.length
-        const shareBack = (t.total * backRate) / tableCasts.length
+        const shareBack = overThreshold ? (t.total * backRate) / tableCasts.length : 0
         for (const c of tableCasts) {
           const e = ensure(c)
           e.salesAmount += shareSales

@@ -38,7 +38,8 @@ type Agg = ReturnType<typeof emptyAgg>
 // 1取引のバック額（卓バック＋ドリンクバック）。useSalesSummary と同じ考え方。
 function txBack(t: Transaction, backRate: number, drinkRate: number, menuBack: Map<string, number>): number {
   const tableCasts = (t.tableCasts ?? []).filter(Boolean)
-  let back = tableCasts.length > 0 ? t.total * backRate : 0
+  // 卓バックは「会計時に焼き付けた最低会計額」以上のときだけ（過去取引は0=条件なし）
+  let back = (tableCasts.length > 0 && t.total >= (t.backThreshold ?? 0)) ? t.total * backRate : 0
   for (const it of t.items) {
     if (it.category !== DRINK || !it.cast) continue
     const amt = it.priceExTax * it.qty

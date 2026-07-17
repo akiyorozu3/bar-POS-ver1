@@ -91,6 +91,7 @@ export interface Transaction {
   feeAmount: number    // 手数料額（分割時は内訳の合計）
   netAmount: number    // 実入金額（total − feeAmount）
   payments?: PaymentSplit[]  // 分割支払いの内訳（現金＋カード等）。単一支払いのときは無し
+  backThreshold?: number     // 会計時点の「卓バック発生の最低会計額」を焼き付け。未設定=0=条件なし（過去取引は遡及しない）
   primaryCast: string   // 売上が最も多いキャスト（CSV表示用）
   tableCasts: string[]  // 卓バックの受取キャスト（卓の担当。複数なら頭割り）
   completedAt: number   // 会計時刻（Unix ミリ秒）

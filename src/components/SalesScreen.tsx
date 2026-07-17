@@ -49,7 +49,7 @@ function periodRange(period: Period, entryDate: string): [Date, Date] {
 }
 
 export default function SalesScreen() {
-  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, saveBackRate, taxRate, taxMode, saveTaxSettings, seats, orders, closedDates, closeDay, reopenDay, entryDate, casts, payouts, subscribePayouts, addPayout, deletePayout, deleteTransaction, restoreTransaction, role, expenses, recurringExpenses, subscribeExpenses, addExpense, deleteExpense, subscribeRecurringExpenses, addRecurringExpense, deleteRecurringExpense, menus, punches, subscribePunches } = usePosStore()
+  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, backThreshold, saveBackRate, taxRate, taxMode, saveTaxSettings, seats, orders, closedDates, closeDay, reopenDay, entryDate, casts, payouts, subscribePayouts, addPayout, deletePayout, deleteTransaction, restoreTransaction, role, expenses, recurringExpenses, subscribeExpenses, addExpense, deleteExpense, subscribeRecurringExpenses, addRecurringExpense, deleteRecurringExpense, menus, punches, subscribePunches } = usePosStore()
   const isOwner = role === 'owner'
   const [period, setPeriod] = useState<Period>('today')
   const [customFrom, setCustomFrom] = useState(todayStr())
@@ -81,6 +81,7 @@ export default function SalesScreen() {
   const [qrFee, setQrFee] = useState(String(feeSettings.qr))
   const [backPct, setBackPct] = useState(String(Math.round(backRate * 100)))
   const [drinkPct, setDrinkPct] = useState(String(Math.round(drinkBackRate * 100)))
+  const [backMin, setBackMin] = useState(String(backThreshold))
   const [taxPct, setTaxPct] = useState(String(Math.round(taxRate * 100)))
   const [taxModeLocal, setTaxModeLocal] = useState(taxMode)
   const [feeSaved, setFeeSaved] = useState(false)
@@ -149,6 +150,17 @@ export default function SalesScreen() {
   let totalOiri = 0, totalDaily = 0
   for (const v of payoutByName.values()) { totalOiri += v.oiri; totalDaily += v.daily }
   const totalPayout = totalLabor + totalBack + totalOiri - totalDaily
+
+  // バック集計の表示行：バック/売上のあるキャスト＋その期間に出勤（打刻）したキャストを合流。
+  // バック0・売上0でも、出勤していれば時給/勤務時間を見られるように表示する。
+  const backByName = new Map(summary.castSummaries.map((c) => [c.name, c]))
+  const allCastNames = new Set<string>([...backByName.keys(), ...[...laborByName.keys()].filter(Boolean)])
+  const castRows = [...allCastNames]
+    .map((name) => {
+      const cs = backByName.get(name)
+      return { name, txCount: cs?.txCount ?? 0, salesAmount: cs?.salesAmount ?? 0, backAmount: cs?.backAmount ?? 0 }
+    })
+    .sort((a, b) => b.salesAmount - a.salesAmount || b.backAmount - a.backAmount || a.name.localeCompare(b.name))
 
   // 日払い/大入（選択期間の分。payouts は購読範囲＝選択期間そのもの）
   const periodDailyPay = payouts.filter((p) => p.type === 'daily').reduce((a, p) => a + p.amount, 0)
@@ -271,6 +283,7 @@ export default function SalesScreen() {
   // 設定が非同期で読み込まれたら入力欄に反映
   useEffect(() => { setBackPct(String(Math.round(backRate * 100))) }, [backRate])
   useEffect(() => { setDrinkPct(String(Math.round(drinkBackRate * 100))) }, [drinkBackRate])
+  useEffect(() => { setBackMin(String(backThreshold)) }, [backThreshold])
   useEffect(() => { setCardFee(String(feeSettings.card)); setQrFee(String(feeSettings.qr)) }, [feeSettings])
   useEffect(() => { setTaxPct(String(Math.round(taxRate * 100))) }, [taxRate])
   useEffect(() => { setTaxModeLocal(taxMode) }, [taxMode])
@@ -279,9 +292,10 @@ export default function SalesScreen() {
     const pct = Math.min(100, Math.max(0, parseFloat(backPct) || 0))
     const dPct = Math.min(100, Math.max(0, parseFloat(drinkPct) || 0))
     const tPct = Math.min(100, Math.max(0, parseFloat(taxPct) || 0))
+    const minAmt = Math.max(0, parseInt(backMin, 10) || 0)
     await Promise.all([
       saveFeeSettings({ card: parseFloat(cardFee) || 0, qr: parseFloat(qrFee) || 0 }),
-      saveBackRate(pct / 100, dPct / 100),
+      saveBackRate(pct / 100, dPct / 100, minAmt),
       saveTaxSettings({ rate: tPct / 100, mode: taxModeLocal }),
     ])
     setFeeSaved(true)
@@ -664,6 +678,15 @@ export default function SalesScreen() {
               </div>
             </div>
             <div className="fee-row">
+              <span className="fee-row-lbl"><i className="ti ti-cash" aria-hidden /> 卓バック発生の最低会計額</span>
+              <div className="fee-input-wrap">
+                <span className="fee-pct">¥</span>
+                <input className="fee-input" type="number" min="0" step="1000"
+                  value={backMin} onChange={(e) => setBackMin(e.target.value)} />
+                <span className="fee-pct" style={{ whiteSpace: 'nowrap' }}>以上</span>
+              </div>
+            </div>
+            <div className="fee-row">
               <span className="fee-row-lbl"><i className="ti ti-glass-cocktail" aria-hidden /> キャストドリンクバック率</span>
               <div className="fee-input-wrap">
                 <input className="fee-input" type="number" min="0" max="100" step="1"
@@ -672,7 +695,7 @@ export default function SalesScreen() {
               </div>
             </div>
             <div className="cat-rate-title" style={{ borderTop: 'none', paddingTop: 0 }}>
-              卓バック＝合計×卓バック率を卓の担当で頭割り／キャストドリンクは料金×ドリンクバック率をその担当へ上乗せ
+              卓バック＝合計×卓バック率を卓の担当で頭割り（会計の税込合計が最低会計額以上のときだけ発生。最低会計額は会計時に取引へ記録するため、設定変更は今後の会計にのみ適用され過去には遡及しません。0＝条件なし）／キャストドリンクは料金×ドリンクバック率をその担当へ上乗せ
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
@@ -780,7 +803,7 @@ export default function SalesScreen() {
             <div className="cast-head">
               <span>キャスト</span><span>卓数</span><span>売上</span><span>バック</span><span>勤務時間</span><span>通算時給</span><span>渡す残額</span>
             </div>
-            {summary.castSummaries.map((c) => {
+            {castRows.map((c) => {
               const w = laborByName.get(c.name)
               const pay = castPayout(c.name, c.backAmount)
               return (

@@ -74,6 +74,9 @@ interface PosState {
   // キャストドリンクのドリンクバック率（ドリンク料金に対する率。例 0.50 = 50%）
   drinkBackRate: number
 
+  // 卓バックが発生する最低会計額（税込合計がこの額以上のときだけ卓バック。0=条件なし）
+  backThreshold: number
+
   // （旧）カテゴリ別バック率。現行モデルでは未使用だが互換のため保持
   categoryRates: Record<string, number>
 
@@ -167,7 +170,7 @@ interface PosState {
   saveFeeSettings: (settings: FeeSettings) => Promise<void>
   loadFeeSettings: () => Promise<void>
 
-  saveBackRate: (rate: number, drinkRate: number) => Promise<void>
+  saveBackRate: (rate: number, drinkRate: number, backThreshold: number) => Promise<void>
   loadBackRate: () => Promise<void>
 
   saveCategoryRates: (rates: Record<string, number>) => Promise<void>
@@ -262,6 +265,7 @@ export const usePosStore = create<PosState>((set, get) => {
   feeSettings: { card: 3.25, qr: 1.98 },
   backRate: BACK_RATE,
   drinkBackRate: 0,
+  backThreshold: 0,
   categoryRates: {},
   taxRate: DEFAULT_TAX_RATE,
   taxMode: 'exclusive',
@@ -475,7 +479,7 @@ export const usePosStore = create<PosState>((set, get) => {
 
   // ── 会計確定 → Firestore書き込み ─────────────
   completePayment: async (seatId, payMethod, _cashReceived, splits) => {
-    const { seats, orders, feeSettings, taxRate, taxMode, entryDate, closedDates } = get()
+    const { seats, orders, feeSettings, taxRate, taxMode, entryDate, closedDates, backThreshold } = get()
     // 締め済みの日付には記録できない
     if (closedDates.includes(entryDate)) {
       throw new Error(`${entryDate} は締め済みです。締め解除すると入力できます。`)
@@ -543,6 +547,7 @@ export const usePosStore = create<PosState>((set, get) => {
       feeAmount,
       netAmount,
       ...(payments ? { payments } : {}),
+      ...(backThreshold > 0 ? { backThreshold } : {}),
       primaryCast,
       tableCasts,
       completedAt: entryDateToTs(entryDate),
@@ -805,19 +810,20 @@ export const usePosStore = create<PosState>((set, get) => {
     }
   },
 
-  // ── バック率の永続化（卓バック率＋ドリンクバック率） ──
-  saveBackRate: async (rate, drinkRate) => {
-    set({ backRate: rate, drinkBackRate: drinkRate })
-    await setDoc(doc(db, COLLECTIONS.SETTINGS, 'back'), { rate, drinkRate })
+  // ── バック率の永続化（卓バック率＋ドリンクバック率＋卓バック発生の最低会計額） ──
+  saveBackRate: async (rate, drinkRate, backThreshold) => {
+    set({ backRate: rate, drinkBackRate: drinkRate, backThreshold })
+    await setDoc(doc(db, COLLECTIONS.SETTINGS, 'back'), { rate, drinkRate, backThreshold })
   },
 
   loadBackRate: async () => {
     const snap = await getDoc(doc(db, COLLECTIONS.SETTINGS, 'back'))
     if (snap.exists()) {
-      const d = snap.data() as { rate?: number; drinkRate?: number }
+      const d = snap.data() as { rate?: number; drinkRate?: number; backThreshold?: number }
       set({
         backRate: d.rate ?? BACK_RATE,
         drinkBackRate: d.drinkRate ?? 0,
+        backThreshold: d.backThreshold ?? 0,
       })
     }
   },
