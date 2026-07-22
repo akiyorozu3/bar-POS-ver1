@@ -39,8 +39,8 @@ async function main() {
     const t = docu.data()
     if (dateStrOf(t.completedAt) !== DATE) return
     const tableCasts = (t.tableCasts || []).filter(Boolean)
-    // ① 卓バック（tableCasts に TARGET が含まれる場合、頭割りで付与）
-    if (tableCasts.includes(TARGET)) {
+    // ① 卓バック（tableCasts に TARGET が含まれ、かつ最低会計額以上のとき頭割りで付与）
+    if (tableCasts.includes(TARGET) && t.total >= (t.backThreshold ?? 0)) {
       const share = (t.total * backRate) / tableCasts.length
       tableBackSum += share
       rows.push({ 卓: t.seatName, 種別: '卓バック', 卓担当: tableCasts.join('・'), 明細: `${t.total}×${backRate*100}%/${tableCasts.length}人`, 現状: Math.round(share), 正しい: Math.round(share) })
