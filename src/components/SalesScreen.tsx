@@ -4,6 +4,7 @@ import type { Transaction, RecurringExpense } from '@/types'
 import { useSalesSummary } from '@/hooks/useSalesSummary'
 import { buildTransactionCSV, buildCastCSV, downloadCSV } from '@/lib/csv'
 import { castLabel } from '@/lib/cast'
+import { BACK_DRINK_CATEGORY } from '@/lib/defaultMenus'
 import { buildShifts, durationMin } from '@/lib/punch'
 import { computeProfit } from '@/lib/profit'
 import { useProfitData } from '@/hooks/useProfitData'
@@ -848,7 +849,14 @@ export default function SalesScreen() {
               {viewTx.items.map((x) => (
                 <div key={x.id} className="co-row">
                   <span className="co-row-name">{x.name} × {x.qty}</span>
-                  <span className="co-row-cast">{x.cast}</span>
+                  <span className="co-row-cast">
+                    {x.cast}
+                    {x.category === BACK_DRINK_CATEGORY && x.drinkBack != null && (
+                      <span className={`co-row-back ${x.drinkBack < 0 ? 'minus' : ''}`}>
+                        {' '}バック{x.drinkBack >= 0 ? '+' : ''}{(x.drinkBack * x.qty).toLocaleString()}
+                      </span>
+                    )}
+                  </span>
                   <span className={`co-row-price ${x.priceExTax < 0 ? 'minus' : ''}`}>¥{(x.priceExTax * x.qty).toLocaleString()}</span>
                 </div>
               ))}

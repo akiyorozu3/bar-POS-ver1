@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { usePosStore } from '@/store/posStore'
 import { calcBill, calcFee } from '@/lib/tax'
+import { BACK_DRINK_CATEGORY } from '@/lib/defaultMenus'
 import type { PayMethod } from '@/types'
 
 const PAY_DEFS: { k: PayMethod; label: string; icon: string }[] = [
@@ -132,7 +133,14 @@ export default function CheckoutScreen({ onBack }: Props) {
           {items.map((x) => (
             <div key={x.id} className="co-row">
               <span className="co-row-name">{x.name} × {x.qty}</span>
-              <span className="co-row-cast">{x.cast}</span>
+              <span className="co-row-cast">
+                {x.cast}
+                {x.category === BACK_DRINK_CATEGORY && x.drinkBack != null && (
+                  <span className={`co-row-back ${x.drinkBack < 0 ? 'minus' : ''}`}>
+                    {' '}バック{x.drinkBack >= 0 ? '+' : ''}{(x.drinkBack * x.qty).toLocaleString()}
+                  </span>
+                )}
+              </span>
               <span className={`co-row-price ${x.priceExTax < 0 ? 'minus' : ''}`}>
                 ¥{(x.priceExTax * x.qty).toLocaleString()}
               </span>

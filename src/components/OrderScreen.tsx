@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { usePosStore } from '@/store/posStore'
 import { displayUnit, calcBill } from '@/lib/tax'
 import { castLabel } from '@/lib/cast'
-import { FREE_PRESETS, MENU_CATEGORIES } from '@/lib/defaultMenus'
+import { FREE_PRESETS, MENU_CATEGORIES, BACK_DRINK_CATEGORY } from '@/lib/defaultMenus'
 import type { MenuItem } from '@/types'
 
 type Tab = typeof MENU_CATEGORIES[number] | '本日限定' | 'フリー入力'
@@ -28,6 +28,9 @@ export default function OrderScreen() {
   const [freeName, setFreeName] = useState('')
   const [freePrice, setFreePrice] = useState('')
   const [discount, setDiscount] = useState('')
+  // フリー入力に任意で付けるバック（バック先＋額。マイナス可＝調整用）
+  const [backCast, setBackCast] = useState('')
+  const [backAmt, setBackAmt] = useState('')
 
   const taxIncluded = taxMode === 'inclusive'
   const taxPct = Math.round(taxRate * 100)
@@ -59,19 +62,26 @@ export default function OrderScreen() {
     })
   }
 
+  // フリー入力：品名と金額。任意でバック先＋バック額（±可）を入れると、そのキャストにバックが付く。
+  // バックだけ付けたい（例：龍さんバック調整）ときは金額を空/0にできる。
   const handleAddFree = () => {
-    if (!currentSeatId || !freeName || !freePrice) return
+    if (!currentSeatId || !freeName.trim()) return
+    const price = parseInt(freePrice, 10)
+    const priceVal = Number.isFinite(price) ? price : 0
+    const amt = parseInt(backAmt, 10)
+    const hasBack = !!backCast && backAmt.trim() !== '' && Number.isFinite(amt)
+    if (priceVal === 0 && !hasBack) return  // 金額もバックも無ければ追加しない
     addOrderItem(currentSeatId, {
-      name: freeName,
-      priceExTax: parseInt(freePrice),
+      name: freeName.trim(),
+      priceExTax: priceVal,
       qty: 1,
-      cast: '',
-      category: 'フリー入力',
+      cast: hasBack ? backCast : '',
+      category: hasBack ? BACK_DRINK_CATEGORY : 'フリー入力',
       isToday: false,
       isFree: true,
+      ...(hasBack ? { drinkBack: amt } : {}),
     })
-    setFreeName('')
-    setFreePrice('')
+    setFreeName(''); setFreePrice(''); setBackCast(''); setBackAmt('')
   }
 
   // 割引：入力は正の金額、明細にはマイナスで追加する
@@ -153,20 +163,37 @@ export default function OrderScreen() {
           {/* メニューグリッド */}
           {tab === 'フリー入力' ? (
             <div className="free-area">
-              <p className="free-title">品名と金額（{taxIncluded ? '税込' : '税抜'}）を入力</p>
+              <p className="free-title">品名と金額（{taxIncluded ? '税込' : '税抜'}）を入力。バックを付けたいときだけ下段にバック先と額（±可）を入れる</p>
               <div className="free-row">
                 <input
                   className="free-name-input"
-                  placeholder="品名（例：ボトルチャージ）"
+                  placeholder="品名（例：ボトルチャージ／お土産ドリンク）"
                   value={freeName}
                   onChange={(e) => setFreeName(e.target.value)}
                 />
                 <input
                   className="free-price-input"
                   type="number"
-                  placeholder="金額"
+                  placeholder="金額（0可）"
                   value={freePrice}
                   onChange={(e) => setFreePrice(e.target.value)}
+                />
+              </div>
+              <div className="free-row">
+                <select
+                  className="cast-sel backdrink-cast"
+                  value={backCast}
+                  onChange={(e) => setBackCast(e.target.value)}
+                >
+                  <option value="">バックなし</option>
+                  {casts.map((c) => <option key={c.id}>{castLabel(c)}</option>)}
+                </select>
+                <input
+                  className="free-price-input"
+                  type="number"
+                  placeholder="バック額（±）"
+                  value={backAmt}
+                  onChange={(e) => setBackAmt(e.target.value)}
                 />
                 <button className="free-add-btn" onClick={handleAddFree}>
                   追加
@@ -345,6 +372,14 @@ export default function OrderScreen() {
                           <span className="t-back-unit">円/杯</span>
                         </span>
                       )}
+                    </div>
+                  )}
+                  {item.category === BACK_DRINK_CATEGORY && (
+                    <div className="t-cast-row">
+                      <span className="t-cast-lbl">バック：{item.cast || '未設定'}</span>
+                      <span className={`t-back-view ${(item.drinkBack ?? 0) < 0 ? 'minus' : ''}`}>
+                        {(item.drinkBack ?? 0) >= 0 ? '+' : ''}{(item.drinkBack ?? 0).toLocaleString()}円
+                      </span>
                     </div>
                   )}
                 </div>

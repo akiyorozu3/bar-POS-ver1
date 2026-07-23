@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { Transaction, SalesSummary, PayMethod } from '@/types'
 import { usePosStore } from '@/store/posStore'
+import { DRINK_BACK_CATEGORY, DRINK_BACK_CATEGORIES } from '@/lib/defaultMenus'
 
 const PAY_METHODS: PayMethod[] = ['cash', 'card', 'qr']
 
@@ -8,7 +9,7 @@ const PAY_METHODS: PayMethod[] = ['cash', 'card', 'qr']
  * 取引一覧から売上サマリーを計算するフック。
  * Firestore からの transactions をそのまま渡せば OK。
  */
-const DRINK_CATEGORY = 'キャストドリンク'
+const DRINK_CATEGORY = DRINK_BACK_CATEGORY
 
 export function useSalesSummary(transactions: Transaction[]): SalesSummary {
   const backRate = usePosStore((s) => s.backRate)            // 卓バック率
@@ -80,7 +81,8 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
       // ② ドリンクバック：その品目の担当へ上乗せ
       //   drinkBack（円/杯）が記録されていればそれ×杯数、無ければ旧仕様の 料金×ドリンクバック率
       for (const item of t.items) {
-        if (item.category !== DRINK_CATEGORY) continue
+        // キャストドリンク＋特例バックドリンクを対象（後者は品目・値段・バックをその場入力／バックはマイナス可）
+        if (!DRINK_BACK_CATEGORIES.includes(item.category)) continue
         const c = item.cast || UNASSIGNED
         const amt = item.priceExTax * item.qty
         const e = ensure(c)

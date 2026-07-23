@@ -33,6 +33,13 @@ export const DEFAULT_MENUS: Omit<MenuItem, 'id'>[] = [
 export const MENU_CATEGORIES = ['セット', 'ショット', 'シャンパン', 'キャストドリンク', 'ウイスキー', 'カクテル', 'ビール', 'フード'] as const
 export type MenuCategory = typeof MENU_CATEGORIES[number]
 
+/** ドリンクバック対象カテゴリ（バック集計で item.cast へ item.drinkBack を上乗せ） */
+export const DRINK_BACK_CATEGORY = 'キャストドリンク'
+/** 特例バックドリンク（品目・値段・バックをその場入力。バックはマイナス可＝調整用） */
+export const BACK_DRINK_CATEGORY = 'バックドリンク'
+/** バック集計でドリンクバックとして扱うカテゴリ一覧 */
+export const DRINK_BACK_CATEGORIES: readonly string[] = [DRINK_BACK_CATEGORY, BACK_DRINK_CATEGORY]
+
 /** よく使うフリー入力プリセット */
 export const FREE_PRESETS = [
   { name: 'ボトルチャージ',    priceExTax: 2000 },

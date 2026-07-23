@@ -4,8 +4,9 @@ import type { Transaction, Payout, Expense, RecurringExpense, Cast, MenuItem } f
 import type { Shift } from '@/lib/punch'
 import { durationMin } from '@/lib/punch'
 import { dateStrOf } from '@/store/posStore'
+import { DRINK_BACK_CATEGORY, DRINK_BACK_CATEGORIES } from '@/lib/defaultMenus'
 
-const DRINK = 'キャストドリンク'
+const DRINK = DRINK_BACK_CATEGORY
 
 export interface ProfitRow {
   key: string        // 日別=YYYY-MM-DD / 月別=YYYY-MM
@@ -41,7 +42,7 @@ function txBack(t: Transaction, backRate: number, drinkRate: number, menuBack: M
   // 卓バックは「会計時に焼き付けた最低会計額」以上のときだけ（過去取引は0=条件なし）
   let back = (tableCasts.length > 0 && t.total >= (t.backThreshold ?? 0)) ? t.total * backRate : 0
   for (const it of t.items) {
-    if (it.category !== DRINK || !it.cast) continue
+    if (!DRINK_BACK_CATEGORIES.includes(it.category) || !it.cast) continue
     const amt = it.priceExTax * it.qty
     back += it.drinkBack != null ? it.drinkBack * it.qty
       : menuBack.has(it.name) ? (menuBack.get(it.name) as number) * it.qty
