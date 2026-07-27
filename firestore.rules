@@ -66,6 +66,14 @@ service cloud.firestore {
       allow read, write: if canSales();
     }
 
+    // 予定シフト・シフト週：オーナー・マネージャーのみ（閲覧・編集）
+    match /shifts/{id} {
+      allow read, write: if canSales();
+    }
+    match /shiftWeeks/{id} {
+      allow read, write: if canSales();
+    }
+
     // 手数料設定：ログイン済みは閲覧可（会計計算に必要） / 変更はオーナーのみ
     match /settings/{id} {
       allow read: if isAuthed();

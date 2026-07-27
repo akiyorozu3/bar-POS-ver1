@@ -32,7 +32,7 @@ import { db, auth, COLLECTIONS } from '@/lib/firebase'
 import { idToEmail, emailToRole } from '@/lib/authConfig'
 import { calcBill, calcFee, DEFAULT_TAX_RATE } from '@/lib/tax'
 import { DEFAULT_MENUS } from '@/lib/defaultMenus'
-import type { Seat, OrderItem, MenuItem, Cast, Transaction, FeeSettings, PayMethod, Role, TaxMode, TaxSettings, Closure, Punch, Payout, Expense, RecurringExpense } from '@/types'
+import type { Seat, OrderItem, MenuItem, Cast, Transaction, FeeSettings, PayMethod, Role, TaxMode, TaxSettings, Closure, Punch, Payout, Expense, RecurringExpense, ScheduledShift, ShiftWeek } from '@/types'
 
 // 初期投入用のデフォルトキャスト（実データは Firestore で管理）
 export const DEFAULT_CASTS = ['さくら', 'あおい', 'ひなた', 'れいな']
@@ -160,6 +160,15 @@ interface PosState {
   addRecurringExpense: (item: string, amount: number, cycle: 'monthly' | 'weekly', day: number) => Promise<void>
   deleteRecurringExpense: (id: string) => Promise<void>
 
+  // 予定シフト（シフト管理・owner/manager）
+  shifts: ScheduledShift[]
+  shiftWeeks: ShiftWeek[]
+  subscribeShifts: (fromStr: string, toStr: string) => () => void
+  subscribeShiftWeeks: () => () => void
+  saveShift: (castId: string, date: string, data: { startTime: string; endTime: string; role: 'open' | 'close' | null }) => Promise<void>
+  deleteShift: (castId: string, date: string) => Promise<void>
+  setWeekConfirmed: (weekId: string, confirmed: boolean) => Promise<void>
+
   subscribePunches: (from: Date, to: Date) => () => void
   addPunch: (castId: string, type: 'in' | 'out') => Promise<void>
   addPunchAt: (castId: string, type: 'in' | 'out', at: number) => Promise<void>
@@ -276,6 +285,8 @@ export const usePosStore = create<PosState>((set, get) => {
   payouts: [],
   expenses: [],
   recurringExpenses: [],
+  shifts: [],
+  shiftWeeks: [],
 
   // ── 認証 ─────────────────────────────────────
   initAuth: () => {
@@ -712,6 +723,45 @@ export const usePosStore = create<PosState>((set, get) => {
   },
 
   // ── 打刻 ──────────────────────────────────────
+  // ── 予定シフト ───────────────────────────────
+  // 表示中の週（月〜日）の暦日レンジを購読。date は "YYYY-MM-DD" 文字列比較で範囲取得。
+  subscribeShifts: (fromStr, toStr) => {
+    const q = query(
+      collection(db, COLLECTIONS.SHIFTS),
+      where('date', '>=', fromStr),
+      where('date', '<=', toStr)
+    )
+    const unsub = onSnapshot(q, (snap) => {
+      set({ shifts: snap.docs.map((d) => ({ id: d.id, ...d.data() } as ScheduledShift)) })
+    }, () => { /* ルール未公開等は無視 */ })
+    return unsub
+  },
+  subscribeShiftWeeks: () => {
+    const unsub = onSnapshot(collection(db, COLLECTIONS.SHIFT_WEEKS), (snap) => {
+      set({ shiftWeeks: snap.docs.map((d) => ({ id: d.id, ...d.data() } as ShiftWeek)) })
+    }, () => { /* 無視 */ })
+    return unsub
+  },
+  // 1キャスト×1日で1件（ID固定）。upsert。
+  saveShift: async (castId, date, data) => {
+    await setDoc(doc(db, COLLECTIONS.SHIFTS, `${castId}_${date}`), {
+      castId, date,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      role: data.role,
+    })
+  },
+  deleteShift: async (castId, date) => {
+    await deleteDoc(doc(db, COLLECTIONS.SHIFTS, `${castId}_${date}`))
+  },
+  setWeekConfirmed: async (weekId, confirmed) => {
+    await setDoc(
+      doc(db, COLLECTIONS.SHIFT_WEEKS, weekId),
+      { confirmedAt: confirmed ? Date.now() : null },
+      { merge: true }
+    )
+  },
+
   subscribePunches: (from, to) => {
     const q = query(
       collection(db, COLLECTIONS.PUNCHES),

@@ -20,6 +20,25 @@ export interface OrderItem {
   drinkBack?: number   // 記録時のドリンクバック額（円/杯）。キャストドリンクのみ。未設定なら旧ドリンクバック率(%)で計算
 }
 
+// ── 予定シフト（シフト管理） ─────────────────────
+// 打刻から算出する実績シフト（lib/punch の Shift）とは別物。こちらは「予定」。
+// 1キャスト×1日で1件（ドキュメントID = `${castId}_${date}`）。休み＝レコード無し。
+export interface ScheduledShift {
+  id: string
+  castId: string
+  date: string                       // "YYYY-MM-DD"（勤務日＝出勤開始の暦日。月曜始まり週で扱う）
+  startTime: string                  // "19:00"
+  endTime: string                    // "23:00"（開始より小さければ翌朝跨ぎ）
+  role: 'open' | 'close' | null      // OP / CL 担当（null＝担当なし）
+}
+
+// ── シフト週（週単位の確定/通知状態） ─────────────
+export interface ShiftWeek {
+  id: string             // weekId "YYYY-Www"（ISO週・月曜始まり。例 2026-W30）
+  confirmedAt?: number | null   // 週確定日時（null/未設定＝未確定）
+  notifiedAt?: number | null    // 最終通知日時（Phase 2 の LINE通知用。今は未使用）
+}
+
 // ── キャスト ─────────────────────────────────────
 export interface Cast {
   id: string
