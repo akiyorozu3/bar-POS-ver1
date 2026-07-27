@@ -19,6 +19,7 @@ interface Props {
 export default function CheckoutScreen({ onBack }: Props) {
   const { seats, currentSeatId, orders, feeSettings, completePayment, setCurrentSeat, role, taxRate, taxMode, entryDate, closedDates } = usePosStore()
   const isOwner = role === 'owner'
+  const canBack = role === 'owner' || role === 'manager'  // バック額の表示はオーナー/マネージャーのみ
   const dayClosed = closedDates.includes(entryDate)
   const taxIncluded = taxMode === 'inclusive'
   const taxPct = Math.round(taxRate * 100)
@@ -135,7 +136,7 @@ export default function CheckoutScreen({ onBack }: Props) {
               <span className="co-row-name">{x.name} × {x.qty}</span>
               <span className="co-row-cast">
                 {x.cast}
-                {x.category === BACK_DRINK_CATEGORY && x.drinkBack != null && (
+                {x.category === BACK_DRINK_CATEGORY && x.drinkBack != null && canBack && (
                   <span className={`co-row-back ${x.drinkBack < 0 ? 'minus' : ''}`}>
                     {' '}バック{x.drinkBack >= 0 ? '+' : ''}{(x.drinkBack * x.qty).toLocaleString()}
                   </span>

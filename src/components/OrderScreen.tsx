@@ -15,6 +15,8 @@ export default function OrderScreen() {
     taxRate, taxMode, tableNames, role,
   } = usePosStore()
   const isOwner = role === 'owner'
+  // フリー入力のバック付与はオーナー・マネージャーのみ（スタッフは通常のフリー入力・割引だけ）
+  const canBack = role === 'owner' || role === 'manager'
 
   const handleCloseSeat = (s: { id: string; name: string }) => {
     const items = orders[s.id] ?? []
@@ -163,11 +165,13 @@ export default function OrderScreen() {
           {/* メニューグリッド */}
           {tab === 'フリー入力' ? (
             <div className="free-area">
-              <p className="free-title">品名と金額（{taxIncluded ? '税込' : '税抜'}）を入力。バックを付けたいときだけ下段にバック先と額（±可）を入れる</p>
+              <p className="free-title">
+                品名と金額（{taxIncluded ? '税込' : '税抜'}）を入力{canBack ? '。バックを付けたいときだけ下段にバック先と額（±可）を入れる' : ''}
+              </p>
               <div className="free-row">
                 <input
                   className="free-name-input"
-                  placeholder="品名（例：ボトルチャージ／お土産ドリンク）"
+                  placeholder={canBack ? '品名（例：ボトルチャージ／お土産ドリンク）' : '品名（例：ボトルチャージ）'}
                   value={freeName}
                   onChange={(e) => setFreeName(e.target.value)}
                 />
@@ -178,27 +182,29 @@ export default function OrderScreen() {
                   value={freePrice}
                   onChange={(e) => setFreePrice(e.target.value)}
                 />
-              </div>
-              <div className="free-row">
-                <select
-                  className="cast-sel backdrink-cast"
-                  value={backCast}
-                  onChange={(e) => setBackCast(e.target.value)}
-                >
-                  <option value="">バックなし</option>
-                  {casts.map((c) => <option key={c.id}>{castLabel(c)}</option>)}
-                </select>
-                <input
-                  className="free-price-input"
-                  type="number"
-                  placeholder="バック額（±）"
-                  value={backAmt}
-                  onChange={(e) => setBackAmt(e.target.value)}
-                />
                 <button className="free-add-btn" onClick={handleAddFree}>
                   追加
                 </button>
               </div>
+              {canBack && (
+                <div className="free-row">
+                  <select
+                    className="cast-sel backdrink-cast"
+                    value={backCast}
+                    onChange={(e) => setBackCast(e.target.value)}
+                  >
+                    <option value="">バックなし</option>
+                    {casts.map((c) => <option key={c.id}>{castLabel(c)}</option>)}
+                  </select>
+                  <input
+                    className="free-price-input"
+                    type="number"
+                    placeholder="バック額（±）"
+                    value={backAmt}
+                    onChange={(e) => setBackAmt(e.target.value)}
+                  />
+                </div>
+              )}
 
               <p className="free-title" style={{ marginTop: 4 }}>割引（金額を入れると明細にマイナスで入ります）</p>
               <div className="free-row">
@@ -374,7 +380,7 @@ export default function OrderScreen() {
                       )}
                     </div>
                   )}
-                  {item.category === BACK_DRINK_CATEGORY && (
+                  {item.category === BACK_DRINK_CATEGORY && canBack && (
                     <div className="t-cast-row">
                       <span className="t-cast-lbl">バック：{item.cast || '未設定'}</span>
                       <span className={`t-back-view ${(item.drinkBack ?? 0) < 0 ? 'minus' : ''}`}>
