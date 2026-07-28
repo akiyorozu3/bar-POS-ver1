@@ -164,8 +164,11 @@ interface PosState {
   // 予定シフト（シフト管理・owner/manager）
   shifts: ScheduledShift[]
   shiftWeeks: ShiftWeek[]
+  shiftCastOrder: string[]   // シフト表専用のキャスト並び順（castId列。注文画面のsortOrderとは別）
   subscribeShifts: (fromStr: string, toStr: string) => () => void
   subscribeShiftWeeks: () => () => void
+  subscribeShiftOrder: () => () => void
+  saveShiftOrder: (orderedIds: string[]) => Promise<void>
   saveShift: (castId: string, date: string, data: { startTime: string; endTime: string; role: 'open' | 'close' | null }) => Promise<void>
   deleteShift: (castId: string, date: string) => Promise<void>
   setWeekConfirmed: (weekId: string, confirmed: boolean) => Promise<void>
@@ -288,6 +291,7 @@ export const usePosStore = create<PosState>((set, get) => {
   recurringExpenses: [],
   shifts: [],
   shiftWeeks: [],
+  shiftCastOrder: [],
 
   // ── 認証 ─────────────────────────────────────
   initAuth: () => {
@@ -755,6 +759,17 @@ export const usePosStore = create<PosState>((set, get) => {
       set({ shiftWeeks: snap.docs.map((d) => ({ id: d.id, ...d.data() } as ShiftWeek)) })
     }, () => { /* 無視 */ })
     return unsub
+  },
+  // シフト表専用のキャスト並び順（全週共通）。注文画面の sortOrder とは別ドキュメントで管理。
+  subscribeShiftOrder: () => {
+    const unsub = onSnapshot(doc(db, COLLECTIONS.SHIFT_SETTINGS, 'castOrder'), (snap) => {
+      const data = snap.data() as { order?: string[] } | undefined
+      set({ shiftCastOrder: data?.order ?? [] })
+    }, () => { /* 無視 */ })
+    return unsub
+  },
+  saveShiftOrder: async (orderedIds) => {
+    await setDoc(doc(db, COLLECTIONS.SHIFT_SETTINGS, 'castOrder'), { order: orderedIds })
   },
   // 1キャスト×1日で1件（ID固定）。upsert。
   saveShift: async (castId, date, data) => {

@@ -40,4 +40,5 @@ export const COLLECTIONS = {
   RECURRING_EXPENSES: 'recurringExpenses',
   SHIFTS: 'shifts',
   SHIFT_WEEKS: 'shiftWeeks',
+  SHIFT_SETTINGS: 'shiftSettings',
 } as const

@@ -468,6 +468,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .shift-badge.draft { background: #f0eee9; color: #888780; }
 .shift-confirm-btn { padding: 5px 12px; border-radius: 6px; border: none; background: #378add; color: #fff; font-size: 11px; font-weight: 500; cursor: pointer; font-family: inherit; }
 .shift-confirm-btn.undo { background: #a32d2d; }
+.shift-share-btn { padding: 5px 12px; border-radius: 6px; border: 0.5px solid #4a9d6a; background: #eef8f1; color: #1f7a3d; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 4px; }
+.shift-share-btn:disabled { opacity: .5; cursor: not-allowed; }
 .shift-alert { background: #fdf2d0; color: #8a6d1a; border: 0.5px solid #e8d48a; border-radius: 6px; padding: 8px 10px; font-size: 12px; }
 
 .shift-table-wrap { overflow-x: auto; border: 0.5px solid #e2e0da; border-radius: 8px; }
@@ -475,6 +477,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .shift-table th, .shift-table td { border: 0.5px solid #e2e0da; padding: 6px 8px; text-align: center; white-space: nowrap; }
 .shift-table thead th { background: #f0eee9; color: #5f5e5a; font-weight: 600; position: sticky; top: 0; }
 .sh-corner, .sh-name { position: sticky; left: 0; background: #f0eee9; z-index: 1; text-align: left; font-weight: 600; color: #1a1a18; min-width: 84px; }
+.sh-name { display: flex; align-items: center; gap: 5px; }
+.sh-name-label { flex: 1; min-width: 0; }
+.sh-move { display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
+.sh-move-btn { width: 18px; height: 12px; line-height: 1; font-size: 7px; border: 0.5px solid #ccc; background: #fff; color: #5f5e5a; border-radius: 3px; cursor: pointer; font-family: inherit; padding: 0; }
+.sh-move-btn:disabled { opacity: .3; cursor: not-allowed; }
 .sh-day.today { background: #dbeafe; color: #1a56a8; }
 .sh-day.missing { background: #fdf2d0; color: #8a6d1a; }
 .sh-count { min-width: 44px; color: #5f5e5a; font-weight: 600; background: #faf9f6; }

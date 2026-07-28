@@ -85,7 +85,7 @@ export default function CastManageScreen() {
           </div>
         ) : (
           <div className="mm-group">
-            <div className="mm-group-title">登録キャスト（{casts.length}名）／並び順はシフト表・担当選択に反映</div>
+            <div className="mm-group-title">登録キャスト（{casts.length}名）／並び順は注文の担当選択に反映（シフト表の並びはシフト画面で調整）</div>
             {casts.map((c, i) => (
               <CastRow key={c.id} cast={c} isFirst={i === 0} isLast={i === casts.length - 1} />
             ))}

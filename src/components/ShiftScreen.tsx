@@ -4,20 +4,31 @@ import { castLabel } from '@/lib/cast'
 import {
   weekMonday, addWeeks, weekDates, ymd, dayLabel, weekRangeLabel, weekIdOf, todayYmd,
 } from '@/lib/week'
+import { shareShiftImage } from '@/lib/shiftImage'
 import type { ScheduledShift } from '@/types'
 
 type EditTarget = { castId: string; castName: string; date: string; dateLabel: string }
 
 export default function ShiftScreen() {
   const {
-    casts: allCasts, shifts, shiftWeeks,
-    subscribeShifts, subscribeShiftWeeks, saveShift, deleteShift, setWeekConfirmed,
+    casts: allCasts, shifts, shiftWeeks, shiftCastOrder,
+    subscribeShifts, subscribeShiftWeeks, subscribeShiftOrder, saveShiftOrder,
+    saveShift, deleteShift, setWeekConfirmed,
   } = usePosStore()
-  // 在籍中のキャストだけシフト表に出す（在籍外＝active:false は非表示。注文・打刻には影響しない）
-  const casts = useMemo(() => allCasts.filter((c) => c.active !== false), [allCasts])
+  // 在籍中のキャストだけシフト表に出す（在籍外＝active:false は非表示。注文・打刻には影響しない）。
+  // 並びはシフト表専用の順（shiftCastOrder）。未登録の人は末尾に sortOrder 順で付ける。
+  const casts = useMemo(() => {
+    const active = allCasts.filter((c) => c.active !== false)
+    const idx = (id: string) => {
+      const i = shiftCastOrder.indexOf(id)
+      return i === -1 ? Number.MAX_SAFE_INTEGER : i
+    }
+    return [...active].sort((a, b) => idx(a.id) - idx(b.id) || a.sortOrder - b.sortOrder)
+  }, [allCasts, shiftCastOrder])
 
   const [monday, setMonday] = useState<Date>(() => weekMonday(new Date()))
   const [editing, setEditing] = useState<EditTarget | null>(null)
+  const [sharing, setSharing] = useState(false)
 
   const dates = useMemo(() => weekDates(monday), [monday])
   const fromStr = ymd(dates[0])
@@ -29,6 +40,18 @@ export default function ShiftScreen() {
   useEffect(() => subscribeShifts(fromStr, toStr), [subscribeShifts, fromStr, toStr])
   // 週の確定状態を購読（全週・少量）
   useEffect(() => subscribeShiftWeeks(), [subscribeShiftWeeks])
+  // シフト表専用の並び順を購読
+  useEffect(() => subscribeShiftOrder(), [subscribeShiftOrder])
+
+  // ▲▼：表示中の並び（casts）で target を dir 方向へ移動し、その全体順を保存
+  const moveRow = (castId: string, dir: -1 | 1) => {
+    const ids = casts.map((c) => c.id)
+    const i = ids.indexOf(castId)
+    const j = i + dir
+    if (i < 0 || j < 0 || j >= ids.length) return
+    ;[ids[i], ids[j]] = [ids[j], ids[i]]
+    saveShiftOrder(ids)
+  }
 
   const shiftMap = useMemo(() => {
     const m = new Map<string, ScheduledShift>()
@@ -54,6 +77,19 @@ export default function ShiftScreen() {
     return c ? castLabel(c) : castId
   }
 
+  // 週表を画像化して共有（スクショ代わり。画面に収まらなくてもOK）
+  const handleShare = async () => {
+    if (sharing || casts.length === 0) return
+    setSharing(true)
+    try {
+      await shareShiftImage({ monday, dates, casts, shifts, nameOf })
+    } catch (e) {
+      alert((e as Error)?.message ?? '画像の共有に失敗しました')
+    } finally {
+      setSharing(false)
+    }
+  }
+
   return (
     <div className="shift-screen">
       {/* ヘッダー：週切替・確定 */}
@@ -68,6 +104,9 @@ export default function ShiftScreen() {
           <button className="shift-thisweek" onClick={() => setMonday(weekMonday(new Date()))}>今週</button>
         </div>
         <div className="shift-confirm-wrap">
+          <button className="shift-share-btn" onClick={handleShare} disabled={sharing || casts.length === 0}>
+            <i className="ti ti-photo-share" aria-hidden /> {sharing ? '作成中…' : '画像で共有'}
+          </button>
           {confirmed
             ? <span className="shift-badge confirmed">確定済み</span>
             : <span className="shift-badge draft">未確定</span>}
@@ -105,11 +144,17 @@ export default function ShiftScreen() {
               </tr>
             </thead>
             <tbody>
-              {casts.map((c) => {
+              {casts.map((c, ri) => {
                 const count = dates.reduce((n, d) => n + (shiftMap.has(`${c.id}_${ymd(d)}`) ? 1 : 0), 0)
                 return (
                   <tr key={c.id}>
-                    <th className="sh-name">{castLabel(c)}</th>
+                    <th className="sh-name">
+                      <span className="sh-move">
+                        <button className="sh-move-btn" onClick={() => moveRow(c.id, -1)} disabled={ri === 0} aria-label="上へ">▲</button>
+                        <button className="sh-move-btn" onClick={() => moveRow(c.id, 1)} disabled={ri === casts.length - 1} aria-label="下へ">▼</button>
+                      </span>
+                      <span className="sh-name-label">{castLabel(c)}</span>
+                    </th>
                     {dates.map((d) => {
                       const ds = ymd(d)
                       const s = shiftMap.get(`${c.id}_${ds}`)

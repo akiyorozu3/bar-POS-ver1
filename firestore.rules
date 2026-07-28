@@ -73,6 +73,10 @@ service cloud.firestore {
     match /shiftWeeks/{id} {
       allow read, write: if canSales();
     }
+    // シフト表専用のキャスト並び順（owner/manager が変更可。casts本体はオーナーのみなので別管理）
+    match /shiftSettings/{id} {
+      allow read, write: if canSales();
+    }
 
     // 手数料設定：ログイン済みは閲覧可（会計計算に必要） / 変更はオーナーのみ
     match /settings/{id} {
