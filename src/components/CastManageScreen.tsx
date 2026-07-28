@@ -85,8 +85,10 @@ export default function CastManageScreen() {
           </div>
         ) : (
           <div className="mm-group">
-            <div className="mm-group-title">登録キャスト（{casts.length}名）</div>
-            {casts.map((c) => <CastRow key={c.id} cast={c} />)}
+            <div className="mm-group-title">登録キャスト（{casts.length}名）／並び順はシフト表・担当選択に反映</div>
+            {casts.map((c, i) => (
+              <CastRow key={c.id} cast={c} isFirst={i === 0} isLast={i === casts.length - 1} />
+            ))}
           </div>
         )}
 
@@ -99,13 +101,14 @@ export default function CastManageScreen() {
   )
 }
 
-// ── 1行（インライン編集 + 削除） ─────────────────
-function CastRow({ cast }: { cast: Cast }) {
-  const { updateCast, deleteCast } = usePosStore()
+// ── 1行（インライン編集 + 並び替え + 在籍 + 削除） ───
+function CastRow({ cast, isFirst, isLast }: { cast: Cast; isFirst: boolean; isLast: boolean }) {
+  const { updateCast, deleteCast, moveCast } = usePosStore()
   const [name, setName] = useState(cast.name)
   const [realName, setRealName] = useState(cast.realName ?? '')
   const [wage, setWage] = useState(cast.hourlyWage != null ? String(cast.hourlyWage) : '')
   const [busy, setBusy] = useState(false)
+  const active = cast.active !== false  // 未設定/true=在籍
 
   const wageNum = parseInt(wage, 10)
   const wageVal = wage.trim() === '' ? undefined : (Number.isFinite(wageNum) && wageNum >= 0 ? wageNum : undefined)
@@ -134,13 +137,25 @@ function CastRow({ cast }: { cast: Cast }) {
   }
 
   return (
-    <div className="mm-row">
+    <div className={`mm-row ${active ? '' : 'inactive'}`}>
+      <span className="cast-move">
+        <button className="cast-move-btn" onClick={() => moveCast(cast.id, -1)} disabled={isFirst || busy} title="上へ" aria-label="上へ">▲</button>
+        <button className="cast-move-btn" onClick={() => moveCast(cast.id, 1)} disabled={isLast || busy} title="下へ" aria-label="下へ">▼</button>
+      </span>
       <input className="mm-row-name" placeholder="ニックネーム" value={name} onChange={(e) => setName(e.target.value)} />
       <input className="mm-row-name" placeholder="本名" value={realName} onChange={(e) => setRealName(e.target.value)} />
       <span className="cast-wage-wrap">
         <input className="cast-wage-input" type="number" min="0" placeholder="時給" value={wage} onChange={(e) => setWage(e.target.value)} />
         <span className="cast-wage-unit">円/h</span>
       </span>
+      <button
+        className={`cast-active-btn ${active ? 'on' : 'off'}`}
+        onClick={async () => { setBusy(true); try { await updateCast(cast.id, { active: !active }) } finally { setBusy(false) } }}
+        disabled={busy}
+        title="シフト表に出す/出さない"
+      >
+        {active ? '在籍' : '在籍外'}
+      </button>
       <button className="mm-row-save" onClick={handleSave} disabled={!dirty || !valid || busy}>保存</button>
       <button className="mm-row-del" onClick={handleDelete} disabled={busy}>削除</button>
     </div>

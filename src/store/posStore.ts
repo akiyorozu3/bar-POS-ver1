@@ -113,8 +113,9 @@ interface PosState {
   // キャスト管理（オーナーのみ）
   subscribeCasts: () => () => void
   addCast: (nickname: string, realName: string, hourlyWage?: number) => Promise<void>
-  updateCast: (id: string, patch: { name?: string; realName?: string; hourlyWage?: number }) => Promise<void>
+  updateCast: (id: string, patch: { name?: string; realName?: string; hourlyWage?: number; active?: boolean }) => Promise<void>
   deleteCast: (id: string) => Promise<void>
+  moveCast: (id: string, dir: -1 | 1) => Promise<void>
   seedDefaultCasts: () => Promise<void>
 
   // アクション
@@ -365,6 +366,19 @@ export const usePosStore = create<PosState>((set, get) => {
 
   deleteCast: async (id) => {
     await deleteDoc(doc(db, COLLECTIONS.CASTS, id))
+  },
+
+  // 並び替え：隣のキャストと sortOrder を入れ替える（表示順は全画面共通）
+  moveCast: async (id, dir) => {
+    const list = [...get().casts].sort((a, b) => a.sortOrder - b.sortOrder)
+    const i = list.findIndex((c) => c.id === id)
+    const j = i + dir
+    if (i < 0 || j < 0 || j >= list.length) return
+    const a = list[i], b = list[j]
+    const batch = writeBatch(db)
+    batch.update(doc(db, COLLECTIONS.CASTS, a.id), { sortOrder: b.sortOrder })
+    batch.update(doc(db, COLLECTIONS.CASTS, b.id), { sortOrder: a.sortOrder })
+    await batch.commit()
   },
 
   seedDefaultCasts: async () => {

@@ -10,9 +10,11 @@ type EditTarget = { castId: string; castName: string; date: string; dateLabel: s
 
 export default function ShiftScreen() {
   const {
-    casts, shifts, shiftWeeks,
+    casts: allCasts, shifts, shiftWeeks,
     subscribeShifts, subscribeShiftWeeks, saveShift, deleteShift, setWeekConfirmed,
   } = usePosStore()
+  // 在籍中のキャストだけシフト表に出す（在籍外＝active:false は非表示。注文・打刻には影響しない）
+  const casts = useMemo(() => allCasts.filter((c) => c.active !== false), [allCasts])
 
   const [monday, setMonday] = useState<Date>(() => weekMonday(new Date()))
   const [editing, setEditing] = useState<EditTarget | null>(null)
@@ -48,7 +50,7 @@ export default function ShiftScreen() {
   const confirmed = confirmedAt != null
 
   const nameOf = (castId: string) => {
-    const c = casts.find((x) => x.id === castId)
+    const c = allCasts.find((x) => x.id === castId)
     return c ? castLabel(c) : castId
   }
 
