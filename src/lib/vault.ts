@@ -38,8 +38,9 @@ const cashOfTx = (t: Transaction): number =>
     : (t.payMethod === 'cash' ? t.total : 0)
 
 const CATEGORY_LABEL: Record<string, string> = {
-  card: 'カード入金', qr: 'QR入金', wage: '給与・人件費',
-  'other-in': 'その他入金', 'other-out': 'その他出金',
+  card: 'カード/QR入金', wage: '給与出金',
+  // 以下は旧データ表示用（現在の入力区分には出さない）
+  qr: 'QR入金', 'other-in': 'その他入金', 'other-out': 'その他出金',
 }
 export const cashCategoryLabel = (c: string): string => CATEGORY_LABEL[c] ?? c
 

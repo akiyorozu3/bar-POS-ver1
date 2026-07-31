@@ -2,13 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { usePosStore, todayStr, businessDayStart } from '@/store/posStore'
 import { buildMovements } from '@/lib/vault'
 
-// 手動入出金の区分（dir=符号）
+// 手動入出金の区分（dir=符号）。その他の入出金は「経費」(±)で記録＝自動反映されるので、
+// ここは経費で表せない分だけ：カード/QR入金（＋）と 給与出金（−）の2つに絞る。
 const CATS: { key: string; label: string; dir: 1 | -1 }[] = [
-  { key: 'card', label: 'カード入金', dir: 1 },
-  { key: 'qr', label: 'QR入金', dir: 1 },
-  { key: 'wage', label: '給与・人件費', dir: -1 },
-  { key: 'other-in', label: 'その他入金', dir: 1 },
-  { key: 'other-out', label: 'その他出金', dir: -1 },
+  { key: 'card', label: 'カード/QR入金', dir: 1 },
+  { key: 'wage', label: '給与出金', dir: -1 },
 ]
 
 const yen = (n: number) => `¥${n.toLocaleString()}`
@@ -98,7 +96,7 @@ export default function VaultScreen() {
 
       {/* 追加フォーム */}
       <div className="vault-add">
-        <div className="vault-add-title">入出金を追加（カード/QR入金・給与・その他）</div>
+        <div className="vault-add-title">入出金を追加（カード/QR入金・給与出金）</div>
         <div className="vault-add-row">
           <input type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} />
           <select value={cat} onChange={(e) => setCat(e.target.value)}>
@@ -110,7 +108,7 @@ export default function VaultScreen() {
           <input className="vault-memo" placeholder="メモ（任意・例：7月分1回目 / ●●さん給与）" value={memo} onChange={(e) => setMemo(e.target.value)} />
           <button className="vault-add-btn" onClick={handleAdd} disabled={busy}>追加</button>
         </div>
-        <div className="vault-hint">現金売上・経費・日払い・大入は自動反映（下の台帳に「自動」表示）。カード/QR売上は入金時にここで手入力。</div>
+        <div className="vault-hint">現金売上・経費・日払い・大入は自動反映（下の台帳に「自動」表示）。カード/QR売上は入金時にここで手入力。その他の雑費・雑収入は「売上管理→経費」(±)で記録すると自動でここに反映されます。</div>
       </div>
 
       {/* 月ナビ＋サマリー */}
