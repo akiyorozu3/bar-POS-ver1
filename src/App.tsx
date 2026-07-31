@@ -8,10 +8,11 @@ import CastManageScreen from '@/components/CastManageScreen'
 import PunchModal from '@/components/PunchModal'
 import PunchManageScreen from '@/components/PunchManageScreen'
 import ShiftScreen from '@/components/ShiftScreen'
+import VaultScreen from '@/components/VaultScreen'
 import LoginScreen from '@/components/LoginScreen'
 import { startVersionCheck } from '@/lib/versionCheck'
 
-type Screen = 'order' | 'checkout' | 'sales' | 'shift' | 'menu' | 'cast' | 'punchmgr'
+type Screen = 'order' | 'checkout' | 'sales' | 'vault' | 'shift' | 'menu' | 'cast' | 'punchmgr'
 
 // 打刻をスタッフにも開放（打刻管理タブはオーナーのみのまま）
 const PUNCH_STAFF_ENABLED = true
@@ -84,7 +85,7 @@ export default function App() {
 
   // 権限が変わったら、許可されない画面からは注文入力に戻す
   useEffect(() => {
-    if ((screen === 'sales' || screen === 'shift') && !canSales) setScreen('order')
+    if ((screen === 'sales' || screen === 'shift' || screen === 'vault') && !canSales) setScreen('order')
     if ((screen === 'menu' || screen === 'cast' || screen === 'punchmgr') && !isOwner) setScreen('order')
   }, [isOwner, canSales, screen])
 
@@ -176,6 +177,14 @@ export default function App() {
         )}
         {canSales && (
           <button
+            className={`nav-btn ${screen === 'vault' ? 'active' : ''}`}
+            onClick={() => setScreen('vault')}
+          >
+            <i className="ti ti-safe" aria-hidden /> 金庫
+          </button>
+        )}
+        {canSales && (
+          <button
             className={`nav-btn ${screen === 'shift' ? 'active' : ''}`}
             onClick={() => setScreen('shift')}
           >
@@ -215,6 +224,7 @@ export default function App() {
           <CheckoutScreen onBack={() => setScreen('order')} />
         )}
         {screen === 'sales' && canSales && <SalesScreen />}
+        {screen === 'vault' && canSales && <VaultScreen />}
         {screen === 'shift' && canSales && <ShiftScreen />}
         {screen === 'menu' && isOwner && <MenuManageScreen />}
         {screen === 'cast' && isOwner && <CastManageScreen />}

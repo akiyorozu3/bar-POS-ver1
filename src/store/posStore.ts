@@ -32,7 +32,7 @@ import { db, auth, COLLECTIONS } from '@/lib/firebase'
 import { idToEmail, emailToRole } from '@/lib/authConfig'
 import { calcBill, calcFee, DEFAULT_TAX_RATE } from '@/lib/tax'
 import { DEFAULT_MENUS } from '@/lib/defaultMenus'
-import type { Seat, OrderItem, MenuItem, Cast, Transaction, FeeSettings, PayMethod, Role, TaxMode, TaxSettings, Closure, Punch, Payout, Expense, RecurringExpense, ScheduledShift, ShiftWeek } from '@/types'
+import type { Seat, OrderItem, MenuItem, Cast, Transaction, FeeSettings, PayMethod, Role, TaxMode, TaxSettings, Closure, Punch, Payout, Expense, RecurringExpense, ScheduledShift, ShiftWeek, CashEntry, CashSettings } from '@/types'
 
 // 初期投入用のデフォルトキャスト（実データは Firestore で管理）
 export const DEFAULT_CASTS = ['さくら', 'あおい', 'ひなた', 'れいな']
@@ -169,6 +169,15 @@ interface PosState {
   subscribeShiftWeeks: () => () => void
   subscribeShiftOrder: () => () => void
   saveShiftOrder: (orderedIds: string[]) => Promise<void>
+
+  // 金庫（お金の残高台帳・owner/manager）
+  cashEntries: CashEntry[]
+  cashOpening: CashSettings
+  subscribeCashEntries: (fromStr: string) => () => void
+  subscribeCashSettings: () => () => void
+  addCashEntry: (date: string, amount: number, category: string, memo: string) => Promise<void>
+  deleteCashEntry: (id: string) => Promise<void>
+  saveCashOpening: (openingBalance: number, openingDate: string) => Promise<void>
   saveShift: (castId: string, date: string, data: { startTime: string; endTime: string; role: 'open' | 'close' | null }) => Promise<void>
   deleteShift: (castId: string, date: string) => Promise<void>
   setWeekConfirmed: (weekId: string, confirmed: boolean) => Promise<void>
@@ -292,6 +301,8 @@ export const usePosStore = create<PosState>((set, get) => {
   shifts: [],
   shiftWeeks: [],
   shiftCastOrder: [],
+  cashEntries: [],
+  cashOpening: { openingBalance: 0, openingDate: `${todayStr().slice(0, 7)}-01` },
 
   // ── 認証 ─────────────────────────────────────
   initAuth: () => {
@@ -770,6 +781,33 @@ export const usePosStore = create<PosState>((set, get) => {
   },
   saveShiftOrder: async (orderedIds) => {
     await setDoc(doc(db, COLLECTIONS.SHIFT_SETTINGS, 'castOrder'), { order: orderedIds })
+  },
+
+  // ── 金庫（お金の残高台帳） ───────────────────
+  subscribeCashEntries: (fromStr) => {
+    const q = query(collection(db, COLLECTIONS.CASH_ENTRIES), where('date', '>=', fromStr))
+    const unsub = onSnapshot(q, (snap) => {
+      set({ cashEntries: snap.docs.map((d) => ({ id: d.id, ...d.data() } as CashEntry)) })
+    }, () => { /* 無視 */ })
+    return unsub
+  },
+  subscribeCashSettings: () => {
+    const unsub = onSnapshot(doc(db, COLLECTIONS.CASH_SETTINGS, 'main'), (snap) => {
+      const d = snap.data() as CashSettings | undefined
+      if (d && typeof d.openingBalance === 'number' && d.openingDate) set({ cashOpening: d })
+    }, () => { /* 無視 */ })
+    return unsub
+  },
+  addCashEntry: async (date, amount, category, memo) => {
+    await addDoc(collection(db, COLLECTIONS.CASH_ENTRIES), {
+      date, amount, category, memo: memo.trim(), at: Date.now(),
+    })
+  },
+  deleteCashEntry: async (id) => {
+    await deleteDoc(doc(db, COLLECTIONS.CASH_ENTRIES, id))
+  },
+  saveCashOpening: async (openingBalance, openingDate) => {
+    await setDoc(doc(db, COLLECTIONS.CASH_SETTINGS, 'main'), { openingBalance, openingDate })
   },
   // 1キャスト×1日で1件（ID固定）。upsert。
   saveShift: async (castId, date, data) => {

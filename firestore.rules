@@ -77,6 +77,13 @@ service cloud.firestore {
     match /shiftSettings/{id} {
       allow read, write: if canSales();
     }
+    // 金庫（お金の残高台帳）：owner/manager が閲覧・入出金・期首残高を管理
+    match /cashEntries/{id} {
+      allow read, write: if canSales();
+    }
+    match /cashSettings/{id} {
+      allow read, write: if canSales();
+    }
 
     // 手数料設定：ログイン済みは閲覧可（会計計算に必要） / 変更はオーナーのみ
     match /settings/{id} {

@@ -508,3 +508,47 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .shift-role-btn.op.sel { background: #1f7a3d; border-color: #1f7a3d; }
 .shift-role-btn.cl.sel { background: #a32d2d; border-color: #a32d2d; }
 .modal-btn.danger { background: #a32d2d; color: #fff; }
+
+/* ── 金庫（お金の残高台帳） ─────────────────────── */
+.vault-screen { padding: 12px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+.vault-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #f8f7f4; border: 0.5px solid #e0ddd5; border-radius: 8px; padding: 12px 14px; }
+.vault-balance { display: flex; flex-direction: column; gap: 2px; }
+.vault-balance-lbl { font-size: 11px; color: #888780; }
+.vault-balance-val { font-size: 26px; font-weight: 700; color: #1D9E75; }
+.vault-balance-val.minus { color: #a32d2d; }
+.vault-opening-btn { padding: 6px 12px; border-radius: 6px; border: 0.5px solid #ccc; background: #fff; color: #5f5e5a; font-size: 11px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+
+.vault-opening { background: #fbf7ee; border: 0.5px solid #e8d9b5; border-radius: 8px; padding: 10px 12px; }
+.vault-opening-title { font-size: 12px; font-weight: 600; color: #8a6d1a; margin-bottom: 6px; }
+
+.vault-add { background: #f8f7f4; border: 0.5px solid #e0ddd5; border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.vault-add-title { font-size: 12px; font-weight: 600; color: #1a1a18; }
+.vault-add-row { display: flex; gap: 6px; align-items: center; }
+.vault-add-row input, .vault-add-row select { padding: 6px 8px; border: 0.5px solid #ccc; border-radius: 6px; background: #fff; color: #1a1a18; font-size: 12px; font-family: inherit; outline: none; }
+.vault-add-row input[type="number"] { width: 110px; text-align: right; margin-left: auto; }
+.vault-memo { flex: 1; min-width: 0; }
+.vault-add-btn { padding: 6px 14px; border-radius: 6px; background: #378add; color: #fff; font-size: 11px; font-weight: 600; border: none; cursor: pointer; font-family: inherit; white-space: nowrap; }
+.vault-add-btn:disabled { opacity: .5; cursor: not-allowed; }
+.vault-hint { font-size: 10px; color: #888780; }
+
+.vault-month-nav { display: flex; align-items: center; gap: 8px; }
+.vault-month-label { font-size: 14px; font-weight: 600; color: #1a1a18; }
+.vault-summary { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: #5f5e5a; padding: 2px 2px 4px; }
+.vault-summary .in { color: #1D9E75; }
+.vault-summary .out { color: #a32d2d; }
+.vault-summary .end { font-weight: 700; color: #1a1a18; }
+
+.vault-table-wrap { overflow-x: auto; border: 0.5px solid #e2e0da; border-radius: 8px; }
+.vault-table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.vault-table th, .vault-table td { border-bottom: 0.5px solid #eee; padding: 6px 8px; text-align: right; white-space: nowrap; }
+.vault-table thead th { background: #f0eee9; color: #5f5e5a; font-weight: 600; text-align: right; position: sticky; top: 0; }
+.vault-table th:nth-child(1), .vault-table th:nth-child(2), .vault-table td:nth-child(1), .vault-table td:nth-child(2) { text-align: left; }
+.vault-table .in { color: #1D9E75; }
+.vault-table .out { color: #a32d2d; }
+.vault-table td.minus { color: #a32d2d; }
+.vault-carry td { background: #faf9f6; color: #888780; font-size: 11px; }
+.vault-label { white-space: normal; }
+.vault-auto { display: inline-block; margin-left: 5px; font-size: 9px; color: #888780; border: 0.5px solid #ccc; border-radius: 3px; padding: 0 3px; vertical-align: middle; }
+.vault-table tr.manual td { background: #fbfcfe; }
+.vault-del { width: 18px; height: 18px; border-radius: 50%; border: 0.5px solid #d8a3a3; background: #fff; color: #a32d2d; font-size: 11px; line-height: 1; cursor: pointer; padding: 0; font-family: inherit; }
+.vault-empty { text-align: center; color: #888780; padding: 16px; }

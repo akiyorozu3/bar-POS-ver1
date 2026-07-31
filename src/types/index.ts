@@ -159,6 +159,24 @@ export interface RecurringExpense {
   at: number
 }
 
+// ── 金庫（お金の残高台帳）の手動入出金 ───────────
+// 現金売上・経費・日払い・大入は既存データから自動反映。ここは手動で足す動きだけ。
+// 例：カード/QR入金（＋）、給与・人件費の支払い（−）、その他入出金（±）。
+export interface CashEntry {
+  id: string
+  date: string       // YYYY-MM-DD（お金が動いた日）
+  amount: number     // 符号込み（＋入金 / −出金）
+  category: string   // 'card' | 'qr' | 'wage' | 'other-in' | 'other-out'
+  memo?: string
+  at: number         // 記録時刻
+}
+
+// 金庫の期首残高（起点）。この日時点の残高から積み上げる。
+export interface CashSettings {
+  openingBalance: number   // 期首残高（円）
+  openingDate: string      // YYYY-MM-DD（この日から集計開始）
+}
+
 // ── レジ締め（日次） ─────────────────────────────
 export interface Closure {
   date: string       // YYYY-MM-DD（ドキュメントID）

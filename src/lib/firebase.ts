@@ -41,4 +41,6 @@ export const COLLECTIONS = {
   SHIFTS: 'shifts',
   SHIFT_WEEKS: 'shiftWeeks',
   SHIFT_SETTINGS: 'shiftSettings',
+  CASH_ENTRIES: 'cashEntries',
+  CASH_SETTINGS: 'cashSettings',
 } as const
