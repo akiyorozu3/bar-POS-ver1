@@ -141,16 +141,23 @@ export default function SalesScreen() {
     else e.daily += p.amount
     payoutByName.set(p.name, e)
   }
-  const castPayout = (name: string, back: number) => {
-    const w = laborByName.get(name)
+  const castByName = new Map(casts.map((c) => [castLabel(c), c]))
+  // 源泉徴収＝(通算時給＋バック)×0.1。「源泉徴収する」キャストのみ・円未満切り捨て。
+  const withholdOf = (name: string, honkyu: number) =>
+    castByName.get(name)?.withholding ? Math.floor(honkyu * 0.1) : 0
+  // 1キャストの各値。本給＝通算時給＋バック。渡す残額＝本給＋大入−日払い−源泉徴収。
+  const castCalc = (name: string, back: number) => {
+    const labor = laborByName.get(name)?.labor ?? 0
     const po = payoutByName.get(name)
-    return (w?.labor ?? 0) + back + (po?.oiri ?? 0) - (po?.daily ?? 0)
+    const honkyu = labor + back
+    const withhold = withholdOf(name, honkyu)
+    const daily = po?.daily ?? 0
+    const oiri = po?.oiri ?? 0
+    return { labor, honkyu, daily, oiri, withhold, payout: honkyu + oiri - daily - withhold }
   }
-  // 渡す残額の合計（全キャスト＝人件費合計＋バック合計＋大入合計−日払い合計）
   const totalLabor = [...laborByName.values()].reduce((a, w) => a + w.labor, 0)
   let totalOiri = 0, totalDaily = 0
   for (const v of payoutByName.values()) { totalOiri += v.oiri; totalDaily += v.daily }
-  const totalPayout = totalLabor + totalBack + totalOiri - totalDaily
 
   // バック集計の表示行：バック/売上のあるキャスト＋その期間に出勤（打刻）したキャストを合流。
   // バック0・売上0でも、出勤していれば時給/勤務時間を見られるように表示する。
@@ -162,6 +169,10 @@ export default function SalesScreen() {
       return { name, txCount: cs?.txCount ?? 0, salesAmount: cs?.salesAmount ?? 0, backAmount: cs?.backAmount ?? 0 }
     })
     .sort((a, b) => b.salesAmount - a.salesAmount || b.backAmount - a.backAmount || a.name.localeCompare(b.name))
+  // 合計（本給＝通算時給＋バック、源泉徴収は源泉ありキャスト分の合計、渡す残額＝本給＋大入−日払い−源泉徴収）
+  const totalHonkyu = totalLabor + totalBack
+  const totalWithhold = castRows.reduce((a, c) => a + withholdOf(c.name, (laborByName.get(c.name)?.labor ?? 0) + c.backAmount), 0)
+  const totalPayout = totalHonkyu + totalOiri - totalDaily - totalWithhold
 
   // 日払い/大入（選択期間の分。payouts は購読範囲＝選択期間そのもの）
   const periodDailyPay = payouts.filter((p) => p.type === 'daily').reduce((a, p) => a + p.amount, 0)
@@ -802,11 +813,11 @@ export default function SalesScreen() {
           <div className="section-title">キャストバック集計</div>
           <div className="cast-table">
             <div className="cast-head">
-              <span>キャスト</span><span>卓数</span><span>売上</span><span>バック</span><span>勤務時間</span><span>通算時給</span><span>渡す残額</span>
+              <span>キャスト</span><span>卓数</span><span>売上</span><span>バック</span><span>勤務時間</span><span>通算時給</span><span>本給</span><span>日払い</span><span>源泉徴収</span><span>渡す残額</span>
             </div>
             {castRows.map((c) => {
               const w = laborByName.get(c.name)
-              const pay = castPayout(c.name, c.backAmount)
+              const cc = castCalc(c.name, c.backAmount)
               return (
                 <div key={c.name} className="cast-row-item">
                   <span>{c.name}</span>
@@ -815,7 +826,10 @@ export default function SalesScreen() {
                   <span className="back-badge">¥{c.backAmount.toLocaleString()}</span>
                   <span>{w ? fmtWorkMin(w.min) : '—'}</span>
                   <span>{w && w.labor > 0 ? `¥${Math.round(w.labor).toLocaleString()}` : '—'}</span>
-                  <span className="payout-cell">¥{Math.round(pay).toLocaleString()}</span>
+                  <span>¥{Math.round(cc.honkyu).toLocaleString()}</span>
+                  <span>{cc.daily > 0 ? `−¥${cc.daily.toLocaleString()}` : '—'}</span>
+                  <span>{cc.withhold > 0 ? `−¥${cc.withhold.toLocaleString()}` : '—'}</span>
+                  <span className="payout-cell">¥{Math.round(cc.payout).toLocaleString()}</span>
                 </div>
               )
             })}
@@ -824,11 +838,14 @@ export default function SalesScreen() {
               <span className="back-badge">¥{totalBack.toLocaleString()}</span>
               <span></span>
               <span>¥{Math.round(totalLabor).toLocaleString()}</span>
+              <span>¥{Math.round(totalHonkyu).toLocaleString()}</span>
+              <span>{totalDaily > 0 ? `−¥${totalDaily.toLocaleString()}` : ''}</span>
+              <span>{totalWithhold > 0 ? `−¥${totalWithhold.toLocaleString()}` : ''}</span>
               <span className="payout-cell">¥{Math.round(totalPayout).toLocaleString()}</span>
             </div>
           </div>
           <div className="mm-note" style={{ paddingTop: 6 }}>
-            渡す残額＝通算時給＋バック＋大入−日払い（すでに渡した日払いを差し引いた、まだ渡す必要のある額）。大入・日払いはキャスト名で突合。
+            本給＝通算時給＋バック。源泉徴収＝(通算時給＋バック)×10%（「源泉徴収する」キャストのみ）。渡す残額＝本給＋大入−日払い−源泉徴収。大入・日払いはキャスト名で突合。
           </div>
         </div>
       </div>

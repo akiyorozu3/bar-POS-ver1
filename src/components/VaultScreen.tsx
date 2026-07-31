@@ -132,10 +132,9 @@ export default function VaultScreen() {
             <tr><th>日付</th><th>内容</th><th>入金</th><th>出金</th><th>残高</th><th /></tr>
           </thead>
           <tbody>
-            <tr className="vault-carry"><td colSpan={4}>繰越残高</td><td>{yen(carry)}</td><td /></tr>
             {rows.length === 0 ? (
               <tr><td colSpan={6} className="vault-empty">この月の動きはありません</td></tr>
-            ) : rows.map((r, i) => (
+            ) : [...rows].reverse().map((r, i) => (
               <tr key={i} className={r.auto ? '' : 'manual'}>
                 <td>{r.date.slice(5).replace('-', '/')}</td>
                 <td className="vault-label">{r.label}{r.auto && <span className="vault-auto">自動</span>}</td>
@@ -147,6 +146,7 @@ export default function VaultScreen() {
                 )}</td>
               </tr>
             ))}
+            <tr className="vault-carry"><td colSpan={4}>繰越残高</td><td>{yen(carry)}</td><td /></tr>
           </tbody>
         </table>
       </div>

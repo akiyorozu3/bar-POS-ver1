@@ -15,7 +15,10 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
   const backRate = usePosStore((s) => s.backRate)            // 卓バック率
   const drinkBackRate = usePosStore((s) => s.drinkBackRate)  // ドリンクバック率
   const menus = usePosStore((s) => s.menus)                  // 保険用：現行メニューの円バック参照
+  const casts = usePosStore((s) => s.casts)                  // バック集計しないキャスト判定用
   return useMemo(() => {
+    // バック集計しないキャスト（名前で判定）。卓バック・ドリンクバックを0扱いにする。
+    const noBackNames = new Set(casts.filter((c) => c.noBack).map((c) => (c.name || c.realName || '').trim()))
     // 保険：明細に円バックが焼き付いていない場合、現行メニューの円バックを商品名で引く。
     // （端末が古い等で焼き付け漏れが起きても、ドリンクバックが0円にならないようにする）
     const menuDrinkBack = new Map<string, number>()
@@ -73,7 +76,7 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
         for (const c of tableCasts) {
           const e = ensure(c)
           e.salesAmount += shareSales
-          e.backRaw += shareBack
+          e.backRaw += noBackNames.has(c) ? 0 : shareBack   // バック集計しないキャストは0
           e.txCount++
         }
       }
@@ -86,7 +89,7 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
         const c = item.cast || UNASSIGNED
         const amt = item.priceExTax * item.qty
         const e = ensure(c)
-        if (c !== UNASSIGNED) {
+        if (c !== UNASSIGNED && !noBackNames.has(c)) {
           // ① 焼き付け済みの円バック → その額（非遡及を維持）
           // ② 未焼き付け → 現行メニューの円バック（保険）
           // ③ それも無ければ → 旧仕様の率
@@ -127,5 +130,5 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
       castSummaries,
       transactions,
     }
-  }, [transactions, backRate, drinkBackRate, menus])
+  }, [transactions, backRate, drinkBackRate, menus, casts])
 }

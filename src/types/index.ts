@@ -46,7 +46,9 @@ export interface Cast {
   realName?: string   // 本名（給与・CSV用）
   hourlyWage?: number // 時給（円/時）。人件費＝時給×勤務時間。未設定は0扱い
   sortOrder: number
-  active?: boolean    // 在籍フラグ。false=シフト表に出さない（未設定/true=在籍中）。注文・打刻・集計には影響しない
+  active?: boolean       // 在籍フラグ。false=シフト表に出さない（未設定/true=在籍中）。注文・打刻・集計には影響しない
+  withholding?: boolean  // 源泉徴収する（未設定/false=しない）。集計で 源泉徴収=(通算時給+バック)×0.1 を控除
+  noBack?: boolean       // バック集計しない（未設定/false=する）。true のとき卓バック・ドリンクバックを0扱い
 }
 
 // ── 打刻 ─────────────────────────────────────────

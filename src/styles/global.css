@@ -278,9 +278,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .bar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
 .bar-val { font-size: 11px; color: #1a1a18; min-width: 32px; text-align: right; }
 .cast-table { background: #f8f7f4; border: 0.5px solid #e0ddd5; border-radius: 8px; overflow-x: auto; }
-.cast-head { display: grid; grid-template-columns: minmax(56px, 1fr) 40px 62px 62px 54px 64px 70px; min-width: 470px; padding: 6px 10px; border-bottom: 0.5px solid #e0ddd5; background: #fff; }
+.cast-head { display: grid; grid-template-columns: minmax(56px, 1fr) 40px 62px 62px 54px 64px 64px 60px 66px 70px; min-width: 640px; padding: 6px 10px; border-bottom: 0.5px solid #e0ddd5; background: #fff; }
 .cast-head span { font-size: 10px; color: #888780; text-transform: uppercase; letter-spacing: .04em; }
-.cast-row-item { display: grid; grid-template-columns: minmax(56px, 1fr) 40px 62px 62px 54px 64px 70px; min-width: 470px; padding: 7px 10px; border-bottom: 0.5px solid #e0ddd5; }
+.cast-row-item { display: grid; grid-template-columns: minmax(56px, 1fr) 40px 62px 62px 54px 64px 64px 60px 66px 70px; min-width: 640px; padding: 7px 10px; border-bottom: 0.5px solid #e0ddd5; }
 .cast-row-item:last-child { border-bottom: none; }
 .cast-row-item span { font-size: 11px; color: #1a1a18; }
 .cast-row-item .payout-cell { font-weight: 700; color: #157a5a; }
@@ -407,9 +407,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .cast-move { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
 .cast-move-btn { width: 22px; height: 15px; line-height: 1; font-size: 8px; border: 0.5px solid #ccc; background: #f8f7f4; color: #5f5e5a; border-radius: 4px; cursor: pointer; font-family: inherit; padding: 0; }
 .cast-move-btn:disabled { opacity: .3; cursor: not-allowed; }
-.cast-active-btn { font-size: 11px; padding: 5px 8px; border-radius: 6px; border: 0.5px solid #ccc; background: #fff; cursor: pointer; font-family: inherit; white-space: nowrap; flex-shrink: 0; }
-.cast-active-btn.on { border-color: #4a9d6a; color: #1f7a3d; background: #eef8f1; }
-.cast-active-btn.off { border-color: #ccc; color: #888780; background: #f0eee9; }
+.mm-row-wrap { padding: 6px 0; border-bottom: 0.5px solid #eee; }
+.mm-row-wrap.inactive { opacity: .55; }
+.mm-row-wrap .mm-row { padding: 0; }
+.mm-flags { display: flex; gap: 6px; padding: 6px 0 0 34px; flex-wrap: wrap; }
+.cast-flag-btn { font-size: 10px; padding: 4px 9px; border-radius: 12px; border: 0.5px solid #ccc; background: #fff; cursor: pointer; font-family: inherit; white-space: nowrap; }
+.cast-flag-btn.on { border-color: #4a9d6a; color: #1f7a3d; background: #eef8f1; }
+.cast-flag-btn.off { border-color: #ccc; color: #888780; background: #f0eee9; }
 .mm-row-name { flex: 1; min-width: 0; padding: 6px 8px; border: 0.5px solid #e0ddd5; border-radius: 6px; background: #f8f7f4; color: #1a1a18; font-size: 12px; font-family: inherit; outline: none; }
 .mm-row-price { width: 70px; padding: 6px 8px; border: 0.5px solid #e0ddd5; border-radius: 6px; background: #f8f7f4; color: #1a1a18; font-size: 12px; font-family: inherit; outline: none; text-align: right; }
 .mm-add-back, .mm-row-back { width: 78px; padding: 6px 8px; border: 0.5px solid #c9a24b; border-radius: 6px; background: #fdf8ec; color: #6b4e12; font-size: 12px; font-family: inherit; outline: none; text-align: right; }

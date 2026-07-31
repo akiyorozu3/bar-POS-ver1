@@ -136,28 +136,40 @@ function CastRow({ cast, isFirst, isLast }: { cast: Cast; isFirst: boolean; isLa
     }
   }
 
+  const withholding = !!cast.withholding   // 源泉徴収する
+  const backOn = !cast.noBack              // バック集計する
+  const toggle = async (patch: { active?: boolean; withholding?: boolean; noBack?: boolean }) => {
+    setBusy(true)
+    try { await updateCast(cast.id, patch) } finally { setBusy(false) }
+  }
+
   return (
-    <div className={`mm-row ${active ? '' : 'inactive'}`}>
-      <span className="cast-move">
-        <button className="cast-move-btn" onClick={() => moveCast(cast.id, -1)} disabled={isFirst || busy} title="上へ" aria-label="上へ">▲</button>
-        <button className="cast-move-btn" onClick={() => moveCast(cast.id, 1)} disabled={isLast || busy} title="下へ" aria-label="下へ">▼</button>
-      </span>
-      <input className="mm-row-name" placeholder="ニックネーム" value={name} onChange={(e) => setName(e.target.value)} />
-      <input className="mm-row-name" placeholder="本名" value={realName} onChange={(e) => setRealName(e.target.value)} />
-      <span className="cast-wage-wrap">
-        <input className="cast-wage-input" type="number" min="0" placeholder="時給" value={wage} onChange={(e) => setWage(e.target.value)} />
-        <span className="cast-wage-unit">円/h</span>
-      </span>
-      <button
-        className={`cast-active-btn ${active ? 'on' : 'off'}`}
-        onClick={async () => { setBusy(true); try { await updateCast(cast.id, { active: !active }) } finally { setBusy(false) } }}
-        disabled={busy}
-        title="シフト表に出す/出さない"
-      >
-        {active ? '在籍' : '在籍外'}
-      </button>
-      <button className="mm-row-save" onClick={handleSave} disabled={!dirty || !valid || busy}>保存</button>
-      <button className="mm-row-del" onClick={handleDelete} disabled={busy}>削除</button>
+    <div className={`mm-row-wrap ${active ? '' : 'inactive'}`}>
+      <div className="mm-row">
+        <span className="cast-move">
+          <button className="cast-move-btn" onClick={() => moveCast(cast.id, -1)} disabled={isFirst || busy} title="上へ" aria-label="上へ">▲</button>
+          <button className="cast-move-btn" onClick={() => moveCast(cast.id, 1)} disabled={isLast || busy} title="下へ" aria-label="下へ">▼</button>
+        </span>
+        <input className="mm-row-name" placeholder="ニックネーム" value={name} onChange={(e) => setName(e.target.value)} />
+        <input className="mm-row-name" placeholder="本名" value={realName} onChange={(e) => setRealName(e.target.value)} />
+        <span className="cast-wage-wrap">
+          <input className="cast-wage-input" type="number" min="0" placeholder="時給" value={wage} onChange={(e) => setWage(e.target.value)} />
+          <span className="cast-wage-unit">円/h</span>
+        </span>
+        <button className="mm-row-save" onClick={handleSave} disabled={!dirty || !valid || busy}>保存</button>
+        <button className="mm-row-del" onClick={handleDelete} disabled={busy}>削除</button>
+      </div>
+      <div className="mm-flags">
+        <button className={`cast-flag-btn ${active ? 'on' : 'off'}`} onClick={() => toggle({ active: !active })} disabled={busy} title="シフト表に出す/出さない">
+          {active ? '在籍' : '在籍外'}
+        </button>
+        <button className={`cast-flag-btn ${withholding ? 'on' : 'off'}`} onClick={() => toggle({ withholding: !withholding })} disabled={busy} title="源泉徴収する/しない">
+          源泉{withholding ? 'あり' : 'なし'}
+        </button>
+        <button className={`cast-flag-btn ${backOn ? 'on' : 'off'}`} onClick={() => toggle({ noBack: backOn })} disabled={busy} title="バック集計する/しない">
+          バック{backOn ? 'あり' : 'なし'}
+        </button>
+      </div>
     </div>
   )
 }

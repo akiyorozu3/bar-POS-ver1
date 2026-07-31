@@ -113,7 +113,7 @@ interface PosState {
   // キャスト管理（オーナーのみ）
   subscribeCasts: () => () => void
   addCast: (nickname: string, realName: string, hourlyWage?: number) => Promise<void>
-  updateCast: (id: string, patch: { name?: string; realName?: string; hourlyWage?: number; active?: boolean }) => Promise<void>
+  updateCast: (id: string, patch: { name?: string; realName?: string; hourlyWage?: number; active?: boolean; withholding?: boolean; noBack?: boolean }) => Promise<void>
   deleteCast: (id: string) => Promise<void>
   moveCast: (id: string, dir: -1 | 1) => Promise<void>
   seedDefaultCasts: () => Promise<void>
