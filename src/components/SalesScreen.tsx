@@ -67,6 +67,7 @@ export default function SalesScreen() {
   // 純利益
   const [showProfitPanel, setShowProfitPanel] = useState(false)
   const [profitMode, setProfitMode] = useState<'day' | 'month'>('day')
+  const [profitDayMonth, setProfitDayMonth] = useState(() => todayStr().slice(0, 7))  // 日別表示の対象月
   // 経費
   const [showExpensePanel, setShowExpensePanel] = useState(false)
   const [expItem, setExpItem] = useState('')
@@ -222,7 +223,13 @@ export default function SalesScreen() {
     recurringExpenses: pd.recurringExpenses, shifts: buildShifts(pd.punches).shifts,
     casts, menus, backRate, drinkBackRate, fromStr: pd.fromStr, toStr: pd.toStr,
   })
-  const profitRows = profitMode === 'day' ? profit.days : profit.months
+  // 日別は対象月だけに絞って表示（7月・8月が混在しないように）
+  const profitRows = profitMode === 'day' ? profit.days.filter((r) => r.key.slice(0, 7) === profitDayMonth) : profit.months
+  const shiftProfitMonth = (delta: number) => {
+    const [y, mo] = profitDayMonth.split('-').map(Number)
+    const d = new Date(y, mo - 1 + delta, 1)
+    setProfitDayMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
+  }
   const thisMonthProfit = profit.months.find((m) => m.key === todayStr().slice(0, 7))
 
   const handleAddPayout = async () => {
@@ -373,12 +380,14 @@ export default function SalesScreen() {
         >
           <i className="ti ti-notes" aria-hidden /> 経費
         </button>
-        <button
-          className={`top-action-btn ${showProfitPanel ? 'active-s' : ''}`}
-          onClick={() => setShowProfitPanel((v) => !v)}
-        >
-          <i className="ti ti-trending-up" aria-hidden /> 純利益
-        </button>
+        {isOwner && (
+          <button
+            className={`top-action-btn ${showProfitPanel ? 'active-s' : ''}`}
+            onClick={() => setShowProfitPanel((v) => !v)}
+          >
+            <i className="ti ti-trending-up" aria-hidden /> 純利益
+          </button>
+        )}
         {isOwner && (
           <button
             className={`top-action-btn ${showClosePanel ? 'active-s' : ''} ${dateClosed ? 'closed' : ''}`}
@@ -547,8 +556,8 @@ export default function SalesScreen() {
           </div>
         )}
 
-        {/* 純利益パネル（オーナー・マネージャー） */}
-        {showProfitPanel && (
+        {/* 純利益パネル（オーナーのみ） */}
+        {showProfitPanel && isOwner && (
           <div className="fee-settings">
             <div className="fee-settings-title">
               <i className="ti ti-trending-up" aria-hidden /> 純利益（直近6ヶ月）
@@ -556,6 +565,14 @@ export default function SalesScreen() {
             <div className="profit-modes">
               <button className={`profit-mode ${profitMode === 'day' ? 'active' : ''}`} onClick={() => setProfitMode('day')}>日別</button>
               <button className={`profit-mode ${profitMode === 'month' ? 'active' : ''}`} onClick={() => setProfitMode('month')}>月別</button>
+              {profitMode === 'day' && (
+                <span className="profit-month-nav">
+                  <button className="date-step" onClick={() => shiftProfitMonth(-1)} aria-label="前の月">‹</button>
+                  <span className="profit-month-label">{profitDayMonth.split('-')[0]}年{Number(profitDayMonth.split('-')[1])}月</span>
+                  <button className="date-step" onClick={() => shiftProfitMonth(1)} aria-label="次の月">›</button>
+                  <button className="shift-thisweek" onClick={() => setProfitDayMonth(todayStr().slice(0, 7))}>今月</button>
+                </span>
+              )}
             </div>
 
             <div className="profit-summary">
@@ -812,41 +829,48 @@ export default function SalesScreen() {
         <div>
           <div className="section-title">キャストバック集計</div>
           <div className="cast-table">
-            <div className="cast-head">
-              <span>キャスト</span><span>卓数</span><span>売上</span><span>バック</span><span>勤務時間</span><span>通算時給</span><span>本給</span><span>日払い</span><span>源泉徴収</span><span>渡す残額</span>
+            <div className={`cast-head ${isOwner ? '' : 'mgr'}`}>
+              <span>キャスト</span><span>卓数</span><span>売上</span><span>バック</span><span>勤務時間</span>
+              {isOwner && <><span>通算時給</span><span>本給</span><span>日払い</span><span>源泉徴収</span><span>渡す残額</span></>}
             </div>
             {castRows.map((c) => {
               const w = laborByName.get(c.name)
               const cc = castCalc(c.name, c.backAmount)
               return (
-                <div key={c.name} className="cast-row-item">
+                <div key={c.name} className={`cast-row-item ${isOwner ? '' : 'mgr'}`}>
                   <span>{c.name}</span>
                   <span>{c.txCount}件</span>
                   <span>¥{c.salesAmount.toLocaleString()}</span>
                   <span className="back-badge">¥{c.backAmount.toLocaleString()}</span>
                   <span>{w ? fmtWorkMin(w.min) : '—'}</span>
-                  <span>{w && w.labor > 0 ? `¥${Math.round(w.labor).toLocaleString()}` : '—'}</span>
-                  <span>¥{Math.round(cc.honkyu).toLocaleString()}</span>
-                  <span>{cc.daily > 0 ? `−¥${cc.daily.toLocaleString()}` : '—'}</span>
-                  <span>{cc.withhold > 0 ? `−¥${cc.withhold.toLocaleString()}` : '—'}</span>
-                  <span className="payout-cell">¥{Math.round(cc.payout).toLocaleString()}</span>
+                  {isOwner && <>
+                    <span>{w && w.labor > 0 ? `¥${Math.round(w.labor).toLocaleString()}` : '—'}</span>
+                    <span>¥{Math.round(cc.honkyu).toLocaleString()}</span>
+                    <span>{cc.daily > 0 ? `−¥${cc.daily.toLocaleString()}` : '—'}</span>
+                    <span>{cc.withhold > 0 ? `−¥${cc.withhold.toLocaleString()}` : '—'}</span>
+                    <span className="payout-cell">¥{Math.round(cc.payout).toLocaleString()}</span>
+                  </>}
                 </div>
               )
             })}
-            <div className="cast-row-item cast-total">
+            <div className={`cast-row-item cast-total ${isOwner ? '' : 'mgr'}`}>
               <span>合計</span><span></span><span></span>
               <span className="back-badge">¥{totalBack.toLocaleString()}</span>
               <span></span>
-              <span>¥{Math.round(totalLabor).toLocaleString()}</span>
-              <span>¥{Math.round(totalHonkyu).toLocaleString()}</span>
-              <span>{totalDaily > 0 ? `−¥${totalDaily.toLocaleString()}` : ''}</span>
-              <span>{totalWithhold > 0 ? `−¥${totalWithhold.toLocaleString()}` : ''}</span>
-              <span className="payout-cell">¥{Math.round(totalPayout).toLocaleString()}</span>
+              {isOwner && <>
+                <span>¥{Math.round(totalLabor).toLocaleString()}</span>
+                <span>¥{Math.round(totalHonkyu).toLocaleString()}</span>
+                <span>{totalDaily > 0 ? `−¥${totalDaily.toLocaleString()}` : ''}</span>
+                <span>{totalWithhold > 0 ? `−¥${totalWithhold.toLocaleString()}` : ''}</span>
+                <span className="payout-cell">¥{Math.round(totalPayout).toLocaleString()}</span>
+              </>}
             </div>
           </div>
-          <div className="mm-note" style={{ paddingTop: 6 }}>
-            本給＝通算時給＋バック。源泉徴収＝(通算時給＋バック)×10%（「源泉徴収する」キャストのみ）。渡す残額＝本給＋大入−日払い−源泉徴収。大入・日払いはキャスト名で突合。
-          </div>
+          {isOwner && (
+            <div className="mm-note" style={{ paddingTop: 6 }}>
+              本給＝通算時給＋バック。源泉徴収＝(通算時給＋バック)×10%（「源泉徴収する」キャストのみ）。渡す残額＝本給＋大入−日払い−源泉徴収。大入・日払いはキャスト名で突合。
+            </div>
+          )}
         </div>
       </div>
 

@@ -180,7 +180,7 @@ export default function App() {
             className={`nav-btn ${screen === 'vault' ? 'active' : ''}`}
             onClick={() => setScreen('vault')}
           >
-            <i className="ti ti-safe" aria-hidden /> 金庫
+            <i className="ti ti-building-bank" aria-hidden /> 金庫
           </button>
         )}
         {canSales && (
