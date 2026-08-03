@@ -230,7 +230,10 @@ export default function SalesScreen() {
     const d = new Date(y, mo - 1 + delta, 1)
     setProfitDayMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
   }
-  const thisMonthProfit = profit.months.find((m) => m.key === todayStr().slice(0, 7))
+  // 緑のサマリーは月ナビで選んだ月に連動（既定は今月）
+  const shownMonthProfit = profit.months.find((m) => m.key === profitDayMonth)
+  const shownMonthIsThis = profitDayMonth === todayStr().slice(0, 7)
+  const shownMonthLabel = `${profitDayMonth.split('-')[0]}年${Number(profitDayMonth.split('-')[1])}月`
 
   const handleAddPayout = async () => {
     const amt = Math.abs(parseInt(payoutAmount, 10))
@@ -576,12 +579,12 @@ export default function SalesScreen() {
             </div>
 
             <div className="profit-summary">
-              <div className="profit-summary-lbl">今月の純利益</div>
-              <div className={`profit-summary-val ${(thisMonthProfit?.profit ?? 0) < 0 ? 'minus' : ''}`}>¥{(thisMonthProfit?.profit ?? 0).toLocaleString()}</div>
+              <div className="profit-summary-lbl">{shownMonthLabel}の純利益{shownMonthIsThis ? '（今月）' : ''}</div>
+              <div className={`profit-summary-val ${(shownMonthProfit?.profit ?? 0) < 0 ? 'minus' : ''}`}>¥{(shownMonthProfit?.profit ?? 0).toLocaleString()}</div>
               <div className="profit-summary-sub">
-                {thisMonthProfit
-                  ? `実入金 ¥${thisMonthProfit.sales.toLocaleString()} − 人件費 ¥${thisMonthProfit.labor.toLocaleString()} − バック ¥${thisMonthProfit.back.toLocaleString()} − 大入 ¥${thisMonthProfit.oiri.toLocaleString()}${thisMonthProfit.expense < 0 ? ' − 経費 ¥' + Math.abs(thisMonthProfit.expense).toLocaleString() : thisMonthProfit.expense > 0 ? ' ＋ 経費 ¥' + thisMonthProfit.expense.toLocaleString() : ''}`
-                  : '今月のデータはまだありません'}
+                {shownMonthProfit
+                  ? `実入金 ¥${shownMonthProfit.sales.toLocaleString()} − 人件費 ¥${shownMonthProfit.labor.toLocaleString()} − バック ¥${shownMonthProfit.back.toLocaleString()} − 大入 ¥${shownMonthProfit.oiri.toLocaleString()}${shownMonthProfit.expense < 0 ? ' − 経費 ¥' + Math.abs(shownMonthProfit.expense).toLocaleString() : shownMonthProfit.expense > 0 ? ' ＋ 経費 ¥' + shownMonthProfit.expense.toLocaleString() : ''}`
+                  : `${shownMonthLabel}のデータはまだありません`}
               </div>
             </div>
 
