@@ -3,7 +3,7 @@ import { usePosStore, todayStr, dateStrOf, businessDayStart, businessDayEnd } fr
 import type { Transaction, RecurringExpense } from '@/types'
 import { useSalesSummary } from '@/hooks/useSalesSummary'
 import { buildTransactionCSV, buildCastCSV, downloadCSV } from '@/lib/csv'
-import { castLabel } from '@/lib/cast'
+import { castLabel, wageOn } from '@/lib/cast'
 import { BACK_DRINK_CATEGORY } from '@/lib/defaultMenus'
 import { buildShifts, durationMin } from '@/lib/punch'
 import { computeProfit } from '@/lib/profit'
@@ -126,7 +126,8 @@ export default function SalesScreen() {
   for (const s of buildShifts(punches).shifts) {
     const m = durationMin(s.inAt, s.outAt)
     if (m == null) continue
-    const wage = casts.find((c) => c.id === s.castId)?.hourlyWage ?? 0
+    const c = casts.find((c) => c.id === s.castId)
+    const wage = c ? wageOn(c, s.date) : 0   // シフト日付に応じた時給（変更履歴があれば過去は旧時給）
     const e = laborByName.get(s.name) ?? { min: 0, labor: 0 }
     e.min += m
     e.labor += wage * (m / 60)

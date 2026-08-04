@@ -44,7 +44,9 @@ export interface Cast {
   id: string
   name: string        // ニックネーム（源氏名。店内表示に使う）
   realName?: string   // 本名（給与・CSV用）
-  hourlyWage?: number // 時給（円/時）。人件費＝時給×勤務時間。未設定は0扱い
+  hourlyWage?: number // 現在の時給（円/時）。人件費＝時給×勤務時間。未設定は0扱い
+  // 時給の変更履歴（この日から◯円）。設定時はこちらを優先し、シフト日付に応じた時給で人件費を計算（過去は旧時給のまま）。
+  wageHistory?: { from: string; wage: number }[]  // from=YYYY-MM-DD（適用開始日）
   sortOrder: number
   active?: boolean       // 在籍フラグ。false=シフト表に出さない（未設定/true=在籍中）。注文・打刻・集計には影響しない
   withholding?: boolean  // 源泉徴収する（未設定/false=しない）。集計で 源泉徴収=(通算時給+バック)×0.1 を控除

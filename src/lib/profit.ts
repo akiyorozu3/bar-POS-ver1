@@ -3,6 +3,7 @@
 import type { Transaction, Payout, Expense, RecurringExpense, Cast, MenuItem } from '@/types'
 import type { Shift } from '@/lib/punch'
 import { durationMin } from '@/lib/punch'
+import { wageOn } from '@/lib/cast'
 import { dateStrOf } from '@/store/posStore'
 import { DRINK_BACK_CATEGORY, DRINK_BACK_CATEGORIES } from '@/lib/defaultMenus'
 
@@ -54,8 +55,7 @@ function txBack(t: Transaction, backRate: number, drinkRate: number, menuBack: M
 export function computeProfit(p: Params): { days: ProfitRow[]; months: ProfitRow[]; total: ProfitRow } {
   const menuBack = new Map<string, number>()
   for (const m of p.menus) if (m.category === DRINK && m.drinkBack != null) menuBack.set(m.name, m.drinkBack)
-  const wageOf = new Map<string, number>()
-  for (const c of p.casts) wageOf.set(c.id, c.hourlyWage ?? 0)
+  const castById = new Map(p.casts.map((c) => [c.id, c]))
 
   const byDay = new Map<string, Agg>()
   const day = (k: string) => { let a = byDay.get(k); if (!a) { a = emptyAgg(); byDay.set(k, a) } return a }
@@ -79,7 +79,8 @@ export function computeProfit(p: Params): { days: ProfitRow[]; months: ProfitRow
   for (const s of p.shifts) {
     const min = durationMin(s.inAt, s.outAt)
     if (min == null) continue
-    day(s.date).labor += (wageOf.get(s.castId) ?? 0) * (min / 60)
+    const c = castById.get(s.castId)
+    day(s.date).labor += (c ? wageOn(c, s.date) : 0) * (min / 60)   // シフト日付の時給（変更履歴対応）
   }
   // 固定費（期間内の該当日に計上）
   const end = new Date(`${p.toStr}T12:00:00`)
