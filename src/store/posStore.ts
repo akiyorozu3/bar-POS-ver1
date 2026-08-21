@@ -175,7 +175,7 @@ interface PosState {
   cashOpening: CashSettings
   subscribeCashEntries: (fromStr: string) => () => void
   subscribeCashSettings: () => () => void
-  addCashEntry: (date: string, amount: number, category: string, memo: string) => Promise<void>
+  addCashEntry: (date: string, amount: number, category: string, memo: string, withholding?: number) => Promise<void>
   deleteCashEntry: (id: string) => Promise<void>
   saveCashOpening: (openingBalance: number, openingDate: string) => Promise<void>
   saveShift: (castId: string, date: string, data: { startTime: string; endTime: string; role: 'open' | 'close' | null }) => Promise<void>
@@ -798,9 +798,10 @@ export const usePosStore = create<PosState>((set, get) => {
     }, () => { /* 無視 */ })
     return unsub
   },
-  addCashEntry: async (date, amount, category, memo) => {
+  addCashEntry: async (date, amount, category, memo, withholding) => {
     await addDoc(collection(db, COLLECTIONS.CASH_ENTRIES), {
       date, amount, category, memo: memo.trim(), at: Date.now(),
+      ...(withholding != null && withholding > 0 ? { withholding } : {}),
     })
   },
   deleteCashEntry: async (id) => {

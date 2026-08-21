@@ -170,8 +170,9 @@ export interface CashEntry {
   id: string
   date: string       // YYYY-MM-DD（お金が動いた日）
   amount: number     // 符号込み（＋入金 / −出金）
-  category: string   // 'card' | 'qr' | 'wage' | 'other-in' | 'other-out'
+  category: string   // 'card' | 'qr' | 'wage' | 'tax-pay'（源泉納付）| 'other-in' | 'other-out'
   memo?: string
+  withholding?: number  // 給与出金に付随して「預かった源泉徴収」額。amountには影響せず、源泉預かり残高の集計にのみ使う
   at: number         // 記録時刻
 }
 

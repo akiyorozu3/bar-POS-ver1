@@ -38,7 +38,7 @@ const cashOfTx = (t: Transaction): number =>
     : (t.payMethod === 'cash' ? t.total : 0)
 
 const CATEGORY_LABEL: Record<string, string> = {
-  card: 'カード/QR入金', wage: '給与出金',
+  card: 'カード/QR入金', wage: '給与出金', 'tax-pay': '源泉納付',
   // 以下は旧データ表示用（現在の入力区分には出さない）
   qr: 'QR入金', 'other-in': 'その他入金', 'other-out': 'その他出金',
 }
@@ -88,7 +88,8 @@ export function buildMovements(p: BuildParams): Movement[] {
   for (const c of p.cashEntries) {
     if (!inRange(c.date)) continue
     const base = cashCategoryLabel(c.category)
-    out.push({ date: c.date, label: c.memo ? `${base}　${c.memo}` : base, kind: 'manual', amount: c.amount, auto: false, entryId: c.id })
+    const wh = c.withholding ? `（源泉¥${c.withholding.toLocaleString()}預かり）` : ''
+    out.push({ date: c.date, label: (c.memo ? `${base}　${c.memo}` : base) + wh, kind: 'manual', amount: c.amount, auto: false, entryId: c.id })
   }
 
   // 日付昇順 → 種別の並び（自動→手動、現金売上/経費/日払い順）で安定化

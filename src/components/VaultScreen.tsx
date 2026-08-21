@@ -7,6 +7,7 @@ import { buildMovements } from '@/lib/vault'
 const CATS: { key: string; label: string; dir: 1 | -1 }[] = [
   { key: 'card', label: 'カード/QR入金', dir: 1 },
   { key: 'wage', label: '給与出金', dir: -1 },
+  { key: 'tax-pay', label: '源泉納付', dir: -1 },
 ]
 
 const yen = (n: number) => `¥${n.toLocaleString()}`
@@ -45,6 +46,11 @@ export default function VaultScreen() {
 
   const currentBalance = cashOpening.openingBalance + movements.reduce((a, m) => a + m.amount, 0)
 
+  // 源泉徴収 預かり残高（未納）＝ 給与出金で預かった源泉の累計 − 源泉納付の累計（現金ベース＝金庫に残っている税預かり）
+  const taxHeld = cashEntries
+    .filter((c) => c.date >= openingDate && c.date <= today)
+    .reduce((a, c) => a + (c.withholding ?? 0) - (c.category === 'tax-pay' ? Math.abs(c.amount) : 0), 0)
+
   // 月ナビ
   const [month, setMonth] = useState(today.slice(0, 7))
   const shiftMonth = (delta: number) => {
@@ -66,15 +72,17 @@ export default function VaultScreen() {
   const [cat, setCat] = useState('card')
   const [amount, setAmount] = useState('')
   const [memo, setMemo] = useState('')
+  const [withhold, setWithhold] = useState('')   // 給与出金の「うち源泉（預かり）」
   const [busy, setBusy] = useState(false)
   const handleAdd = async () => {
     const n = parseInt(amount, 10)
     if (!date || !Number.isFinite(n) || n === 0) return
     const dir = CATS.find((c) => c.key === cat)?.dir ?? 1
+    const wh = cat === 'wage' ? parseInt(withhold, 10) : NaN
     setBusy(true)
     try {
-      await addCashEntry(date, dir * Math.abs(n), cat, memo)
-      setAmount(''); setMemo('')
+      await addCashEntry(date, dir * Math.abs(n), cat, memo, Number.isFinite(wh) && wh > 0 ? wh : undefined)
+      setAmount(''); setMemo(''); setWithhold('')
     } finally { setBusy(false) }
   }
 
@@ -88,6 +96,9 @@ export default function VaultScreen() {
         <div className="vault-balance">
           <span className="vault-balance-lbl">金庫の残高（今日時点・あるべき額）</span>
           <span className={`vault-balance-val ${currentBalance < 0 ? 'minus' : ''}`}>{yen(currentBalance)}</span>
+          {taxHeld !== 0 && (
+            <span className="vault-taxheld">うち源泉徴収 預かり（未納） {yen(taxHeld)}</span>
+          )}
         </div>
         <button className="vault-opening-btn" onClick={() => setShowOpening((v) => !v)}>期首残高</button>
       </div>
@@ -106,9 +117,12 @@ export default function VaultScreen() {
         </div>
         <div className="vault-add-row">
           <input className="vault-memo" placeholder="メモ（任意・例：7月分1回目 / ●●さん給与）" value={memo} onChange={(e) => setMemo(e.target.value)} />
+          {cat === 'wage' && (
+            <input type="number" inputMode="numeric" placeholder="うち源泉(任意)" value={withhold} onChange={(e) => setWithhold(e.target.value)} title="給与から預かった源泉徴収額（手取りで出金した場合）" />
+          )}
           <button className="vault-add-btn" onClick={handleAdd} disabled={busy}>追加</button>
         </div>
-        <div className="vault-hint">現金売上・経費・日払い・大入は自動反映（下の台帳に「自動」表示）。カード/QR売上は入金時にここで手入力。その他の雑費・雑収入は「売上管理→経費」(±)で記録すると自動でここに反映されます。</div>
+        <div className="vault-hint">現金売上・経費・日払い・大入は自動反映（下の台帳に「自動」表示）。カード/QR売上は入金時にここで手入力。給与を手取りで払ったら「うち源泉」に預かり額を入れると、上の「源泉徴収 預かり（未納）」に積み上がります。税務署へ払ったら区分「源泉納付」で出金してください（預かりが減ります）。</div>
       </div>
 
       {/* 月ナビ＋サマリー */}

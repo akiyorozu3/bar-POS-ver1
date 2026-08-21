@@ -524,6 +524,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .vault-balance-lbl { font-size: 11px; color: #888780; }
 .vault-balance-val { font-size: 26px; font-weight: 700; color: #1D9E75; }
 .vault-balance-val.minus { color: #a32d2d; }
+.vault-taxheld { font-size: 11px; color: #8a6d1a; margin-top: 3px; }
 .vault-opening-btn { padding: 6px 12px; border-radius: 6px; border: 0.5px solid #ccc; background: #fff; color: #5f5e5a; font-size: 11px; cursor: pointer; font-family: inherit; white-space: nowrap; }
 
 .vault-opening { background: #fbf7ee; border: 0.5px solid #e8d9b5; border-radius: 8px; padding: 10px 12px; }
