@@ -3,7 +3,7 @@
 import type { Transaction, Payout, Expense, RecurringExpense, Cast, MenuItem } from '@/types'
 import type { Shift } from '@/lib/punch'
 import { durationMin } from '@/lib/punch'
-import { wageOn } from '@/lib/cast'
+import { wageOn, castLabel } from '@/lib/cast'
 import { dateStrOf } from '@/store/posStore'
 import { DRINK_BACK_CATEGORY, DRINK_BACK_CATEGORIES } from '@/lib/defaultMenus'
 
@@ -37,13 +37,18 @@ interface Params {
 const emptyAgg = () => ({ sales: 0, labor: 0, back: 0, oiri: 0, dailyPay: 0, expense: 0 })
 type Agg = ReturnType<typeof emptyAgg>
 
-// 1取引のバック額（卓バック＋ドリンクバック）。useSalesSummary と同じ考え方。
-function txBack(t: Transaction, backRate: number, drinkRate: number, menuBack: Map<string, number>): number {
+// 1取引のバック額（卓バック＋ドリンクバック）。useSalesSummary と完全に同じ考え方。
+// noBackNames（バック集計しないキャスト）は卓バック・ドリンクバックとも0扱い（集計と一致させる）。
+function txBack(t: Transaction, backRate: number, drinkRate: number, menuBack: Map<string, number>, noBackNames: Set<string>): number {
   const tableCasts = (t.tableCasts ?? []).filter(Boolean)
-  // 卓バックは「会計時に焼き付けた最低会計額」以上のときだけ（過去取引は0=条件なし）
-  let back = (tableCasts.length > 0 && t.total >= (t.backThreshold ?? 0)) ? t.total * backRate : 0
+  let back = 0
+  // 卓バックは「会計時に焼き付けた最低会計額」以上のときだけ。担当で頭割りし、バックなしの人の分は除外。
+  if (tableCasts.length > 0 && t.total >= (t.backThreshold ?? 0)) {
+    const share = (t.total * backRate) / tableCasts.length
+    for (const c of tableCasts) if (!noBackNames.has(c)) back += share
+  }
   for (const it of t.items) {
-    if (!DRINK_BACK_CATEGORIES.includes(it.category) || !it.cast) continue
+    if (!DRINK_BACK_CATEGORIES.includes(it.category) || !it.cast || noBackNames.has(it.cast)) continue
     const amt = it.priceExTax * it.qty
     back += it.drinkBack != null ? it.drinkBack * it.qty
       : menuBack.has(it.name) ? (menuBack.get(it.name) as number) * it.qty
@@ -56,6 +61,8 @@ export function computeProfit(p: Params): { days: ProfitRow[]; months: ProfitRow
   const menuBack = new Map<string, number>()
   for (const m of p.menus) if (m.category === DRINK && m.drinkBack != null) menuBack.set(m.name, m.drinkBack)
   const castById = new Map(p.casts.map((c) => [c.id, c]))
+  // バック集計しないキャスト（名前判定）。純利益のバックからも除外して集計と一致させる。
+  const noBackNames = new Set(p.casts.filter((c) => c.noBack).map((c) => castLabel(c)))
 
   const byDay = new Map<string, Agg>()
   const day = (k: string) => { let a = byDay.get(k); if (!a) { a = emptyAgg(); byDay.set(k, a) } return a }
@@ -65,7 +72,7 @@ export function computeProfit(p: Params): { days: ProfitRow[]; months: ProfitRow
     const k = dateStrOf(t.completedAt)
     const a = day(k)
     a.sales += t.netAmount
-    a.back += txBack(t, p.backRate, p.drinkBackRate, menuBack)
+    a.back += txBack(t, p.backRate, p.drinkBackRate, menuBack, noBackNames)
   }
   // 大入・日払い
   for (const po of p.payouts) {

@@ -835,7 +835,7 @@ export default function SalesScreen() {
           <div className="cast-table">
             <div className={`cast-head ${isOwner ? '' : 'mgr'}`}>
               <span>キャスト</span><span>卓数</span><span>売上</span><span>バック</span><span>勤務時間</span>
-              {isOwner && <><span>通算時給</span><span>本給</span><span>日払い</span><span>源泉徴収</span><span>渡す残額</span></>}
+              {isOwner && <><span>通算時給</span><span>本給</span><span>大入</span><span>日払い</span><span>源泉徴収</span><span>渡す残額</span></>}
             </div>
             {castRows.map((c) => {
               const w = laborByName.get(c.name)
@@ -850,6 +850,7 @@ export default function SalesScreen() {
                   {isOwner && <>
                     <span>{w && w.labor > 0 ? `¥${Math.round(w.labor).toLocaleString()}` : '—'}</span>
                     <span>¥{Math.round(cc.honkyu).toLocaleString()}</span>
+                    <span>{cc.oiri > 0 ? `＋¥${cc.oiri.toLocaleString()}` : '—'}</span>
                     <span>{cc.daily > 0 ? `−¥${cc.daily.toLocaleString()}` : '—'}</span>
                     <span>{cc.withhold > 0 ? `−¥${cc.withhold.toLocaleString()}` : '—'}</span>
                     <span className="payout-cell">¥{Math.round(cc.payout).toLocaleString()}</span>
@@ -864,6 +865,7 @@ export default function SalesScreen() {
               {isOwner && <>
                 <span>¥{Math.round(totalLabor).toLocaleString()}</span>
                 <span>¥{Math.round(totalHonkyu).toLocaleString()}</span>
+                <span>{totalOiri > 0 ? `＋¥${totalOiri.toLocaleString()}` : ''}</span>
                 <span>{totalDaily > 0 ? `−¥${totalDaily.toLocaleString()}` : ''}</span>
                 <span>{totalWithhold > 0 ? `−¥${totalWithhold.toLocaleString()}` : ''}</span>
                 <span className="payout-cell">¥{Math.round(totalPayout).toLocaleString()}</span>
