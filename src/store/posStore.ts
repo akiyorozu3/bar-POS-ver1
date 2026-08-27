@@ -155,7 +155,7 @@ interface PosState {
   expenses: Expense[]
   recurringExpenses: RecurringExpense[]
   subscribeExpenses: (from: Date, to: Date) => () => void
-  addExpense: (item: string, amount: number) => Promise<void>
+  addExpense: (item: string, amount: number, date?: string) => Promise<void>
   deleteExpense: (id: string) => Promise<void>
   subscribeRecurringExpenses: () => () => void
   addRecurringExpense: (item: string, amount: number, cycle: 'monthly' | 'weekly', day: number) => Promise<void>
@@ -715,9 +715,9 @@ export const usePosStore = create<PosState>((set, get) => {
     return unsub
   },
 
-  addExpense: async (item, amount) => {
+  addExpense: async (item, amount, date) => {
     await addDoc(collection(db, COLLECTIONS.EXPENSES), {
-      date: get().entryDate,
+      date: date ?? get().entryDate,
       item,
       amount,
       at: Date.now(),

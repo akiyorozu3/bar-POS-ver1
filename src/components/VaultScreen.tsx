@@ -8,6 +8,7 @@ const CATS: { key: string; label: string; dir: 1 | -1 }[] = [
   { key: 'card', label: 'カード/QR入金', dir: 1 },
   { key: 'wage', label: '給与出金', dir: -1 },
   { key: 'tax-pay', label: '源泉納付', dir: -1 },
+  { key: 'expense', label: '経費', dir: -1 },   // 支出/入金（±）。経費として記録し純利益にも反映
 ]
 
 const yen = (n: number) => `¥${n.toLocaleString()}`
@@ -18,7 +19,7 @@ export default function VaultScreen() {
     transactions, expenses, recurringExpenses, payouts, cashEntries, cashOpening,
     subscribeTransactions, subscribeExpenses, subscribePayouts, subscribeRecurringExpenses,
     subscribeCashEntries, subscribeCashSettings,
-    addCashEntry, deleteCashEntry, saveCashOpening,
+    addCashEntry, deleteCashEntry, saveCashOpening, addExpense,
   } = usePosStore()
 
   const today = todayStr()
@@ -73,15 +74,22 @@ export default function VaultScreen() {
   const [amount, setAmount] = useState('')
   const [memo, setMemo] = useState('')
   const [withhold, setWithhold] = useState('')   // 給与出金の「うち源泉（預かり）」
+  const [expSign, setExpSign] = useState<'out' | 'in'>('out')  // 経費の 支出(−)/入金(＋)
   const [busy, setBusy] = useState(false)
   const handleAdd = async () => {
     const n = parseInt(amount, 10)
     if (!date || !Number.isFinite(n) || n === 0) return
-    const dir = CATS.find((c) => c.key === cat)?.dir ?? 1
-    const wh = cat === 'wage' ? parseInt(withhold, 10) : NaN
     setBusy(true)
     try {
-      await addCashEntry(date, dir * Math.abs(n), cat, memo, Number.isFinite(wh) && wh > 0 ? wh : undefined)
+      if (cat === 'expense') {
+        // 経費は expenses として記録 → 金庫に自動反映＋純利益にも反映（単一の真実）
+        const signed = expSign === 'out' ? -Math.abs(n) : Math.abs(n)
+        await addExpense(memo.trim() || '経費', signed, date)
+      } else {
+        const dir = CATS.find((c) => c.key === cat)?.dir ?? 1
+        const wh = cat === 'wage' ? parseInt(withhold, 10) : NaN
+        await addCashEntry(date, dir * Math.abs(n), cat, memo, Number.isFinite(wh) && wh > 0 ? wh : undefined)
+      }
       setAmount(''); setMemo(''); setWithhold('')
     } finally { setBusy(false) }
   }
@@ -113,6 +121,12 @@ export default function VaultScreen() {
           <select value={cat} onChange={(e) => setCat(e.target.value)}>
             {CATS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
           </select>
+          {cat === 'expense' && (
+            <select value={expSign} onChange={(e) => setExpSign(e.target.value as 'out' | 'in')}>
+              <option value="out">支出 −</option>
+              <option value="in">入金 ＋</option>
+            </select>
+          )}
           <input type="number" inputMode="numeric" placeholder="金額" value={amount} onChange={(e) => setAmount(e.target.value)} />
         </div>
         <div className="vault-add-row">
@@ -122,7 +136,7 @@ export default function VaultScreen() {
           )}
           <button className="vault-add-btn" onClick={handleAdd} disabled={busy}>追加</button>
         </div>
-        <div className="vault-hint">現金売上・経費・日払い・大入は自動反映（下の台帳に「自動」表示）。カード/QR売上は入金時にここで手入力。給与を手取りで払ったら「うち源泉」に預かり額を入れると、上の「源泉徴収 預かり（未納）」に積み上がります。税務署へ払ったら区分「源泉納付」で出金してください（預かりが減ります）。</div>
+        <div className="vault-hint">現金売上・日払い・大入は自動反映（下の台帳に「自動」表示）。カード/QR売上は入金時にここで手入力。経費はここから入力でき、売上管理の経費＝純利益にも反映されます（削除・編集は「売上管理→経費」から）。給与を手取りで払ったら「うち源泉」に預かり額を入れると「源泉徴収 預かり（未納）」に積み上がり、税務署へ払ったら区分「源泉納付」で出金すると減ります。</div>
       </div>
 
       {/* 月ナビ＋サマリー */}

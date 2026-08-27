@@ -154,12 +154,12 @@ export default function SalesScreen() {
     const honkyu = labor + back
     const withhold = withholdOf(name, honkyu)
     const daily = po?.daily ?? 0
-    const oiri = po?.oiri ?? 0
-    return { labor, honkyu, daily, oiri, withhold, payout: honkyu + oiri - daily - withhold }
+    // 渡す残額は大入を考慮しない（本給−日払い−源泉徴収）
+    return { labor, honkyu, daily, withhold, payout: honkyu - daily - withhold }
   }
   const totalLabor = [...laborByName.values()].reduce((a, w) => a + w.labor, 0)
-  let totalOiri = 0, totalDaily = 0
-  for (const v of payoutByName.values()) { totalOiri += v.oiri; totalDaily += v.daily }
+  let totalDaily = 0
+  for (const v of payoutByName.values()) totalDaily += v.daily
 
   // バック集計の表示行：バック/売上のあるキャスト＋その期間に出勤（打刻）したキャストを合流。
   // バック0・売上0でも、出勤していれば時給/勤務時間を見られるように表示する。
@@ -174,7 +174,7 @@ export default function SalesScreen() {
   // 合計（本給＝通算時給＋バック、源泉徴収は源泉ありキャスト分の合計、渡す残額＝本給＋大入−日払い−源泉徴収）
   const totalHonkyu = totalLabor + totalBack
   const totalWithhold = castRows.reduce((a, c) => a + withholdOf(c.name, (laborByName.get(c.name)?.labor ?? 0) + c.backAmount), 0)
-  const totalPayout = totalHonkyu + totalOiri - totalDaily - totalWithhold
+  const totalPayout = totalHonkyu - totalDaily - totalWithhold
 
   // 日払い/大入（選択期間の分。payouts は購読範囲＝選択期間そのもの）
   const periodDailyPay = payouts.filter((p) => p.type === 'daily').reduce((a, p) => a + p.amount, 0)
@@ -598,22 +598,39 @@ export default function SalesScreen() {
                   <div className="mm-empty" style={{ padding: 12 }}>読み込み中...</div>
                 ) : profitRows.length === 0 ? (
                   <div className="mm-empty" style={{ padding: 12 }}>データがありません</div>
-                ) : profitRows.map((r) => (
+                ) : profitRows.map((r) => {
+                  const isDay = profitMode === 'day'
+                  // 日別は経費を各日に載せず、純利益＝実入金−人件費−バック−大入（経費除く）。経費は最下行に当月合計。
+                  const dispProfit = isDay ? r.profit - r.expense : r.profit
+                  return (
                   <div className="profit-row" key={r.key}>
-                    <span className="profit-key">{profitMode === 'day' ? r.key.slice(5).replace('-', '/') : r.key.replace('-', '/')}</span>
+                    <span className="profit-key">{isDay ? r.key.slice(5).replace('-', '/') : r.key.replace('-', '/')}</span>
                     <span>¥{r.sales.toLocaleString()}</span>
                     <span className="minus">{r.labor ? `−¥${r.labor.toLocaleString()}` : '—'}</span>
                     <span className="minus">{r.back ? `−¥${r.back.toLocaleString()}` : '—'}</span>
                     <span className="minus">{r.oiri ? `−¥${r.oiri.toLocaleString()}` : '—'}</span>
                     <span className="muted">{r.dailyPay ? `(¥${r.dailyPay.toLocaleString()})` : '—'}</span>
-                    <span className={r.expense < 0 ? 'minus' : ''}>{r.expense ? `${r.expense < 0 ? '−' : '＋'}¥${Math.abs(r.expense).toLocaleString()}` : '—'}</span>
-                    <span className={`profit-val ${r.profit < 0 ? 'minus' : ''}`}>¥{r.profit.toLocaleString()}</span>
+                    <span className={!isDay && r.expense < 0 ? 'minus' : ''}>{isDay ? '—' : (r.expense ? `${r.expense < 0 ? '−' : '＋'}¥${Math.abs(r.expense).toLocaleString()}` : '—')}</span>
+                    <span className={`profit-val ${dispProfit < 0 ? 'minus' : ''}`}>¥{dispProfit.toLocaleString()}</span>
                   </div>
-                ))}
+                  )
+                })}
+                {profitMode === 'day' && profitRows.length > 0 && (
+                  <div className="profit-row profit-expense-row">
+                    <span className="profit-key">経費（当月）</span>
+                    <span /><span /><span /><span /><span />
+                    <span className={(shownMonthProfit?.expense ?? 0) < 0 ? 'minus' : ''}>
+                      {(() => { const me = shownMonthProfit?.expense ?? 0; return me ? `${me < 0 ? '−' : '＋'}¥${Math.abs(me).toLocaleString()}` : '¥0' })()}
+                    </span>
+                    <span />
+                  </div>
+                )}
               </div>
             </div>
             <div className="mm-note" style={{ paddingTop: 6 }}>
-              純利益＝実入金−人件費−バック−大入＋経費。日払いは人件費/バックの前払い分なので差し引かず参考表示（括弧）。人件費＝時給×打刻の勤務時間（退勤済みの分のみ）。時給は「キャスト管理」で登録。
+              {profitMode === 'day'
+                ? '日別の純利益は経費を除いた額です（実入金−人件費−バック−大入）。経費は当月合計を最下行に表示。月別は経費込み。日払いは前払い分なので差し引かず参考表示（括弧）。'
+                : '純利益＝実入金−人件費−バック−大入＋経費。日払いは人件費/バックの前払い分なので差し引かず参考表示（括弧）。人件費＝時給×打刻の勤務時間（退勤済みの分のみ）。'}
             </div>
           </div>
         )}
@@ -835,7 +852,7 @@ export default function SalesScreen() {
           <div className="cast-table">
             <div className={`cast-head ${isOwner ? '' : 'mgr'}`}>
               <span>キャスト</span><span>卓数</span><span>売上</span><span>バック</span><span>勤務時間</span>
-              {isOwner && <><span>通算時給</span><span>本給</span><span>大入</span><span>日払い</span><span>源泉徴収</span><span>渡す残額</span></>}
+              {isOwner && <><span>通算時給</span><span>本給</span><span>日払い</span><span>源泉徴収</span><span>渡す残額</span></>}
             </div>
             {castRows.map((c) => {
               const w = laborByName.get(c.name)
@@ -850,7 +867,6 @@ export default function SalesScreen() {
                   {isOwner && <>
                     <span>{w && w.labor > 0 ? `¥${Math.round(w.labor).toLocaleString()}` : '—'}</span>
                     <span>¥{Math.round(cc.honkyu).toLocaleString()}</span>
-                    <span>{cc.oiri > 0 ? `＋¥${cc.oiri.toLocaleString()}` : '—'}</span>
                     <span>{cc.daily > 0 ? `−¥${cc.daily.toLocaleString()}` : '—'}</span>
                     <span>{cc.withhold > 0 ? `−¥${cc.withhold.toLocaleString()}` : '—'}</span>
                     <span className="payout-cell">¥{Math.round(cc.payout).toLocaleString()}</span>
@@ -865,7 +881,6 @@ export default function SalesScreen() {
               {isOwner && <>
                 <span>¥{Math.round(totalLabor).toLocaleString()}</span>
                 <span>¥{Math.round(totalHonkyu).toLocaleString()}</span>
-                <span>{totalOiri > 0 ? `＋¥${totalOiri.toLocaleString()}` : ''}</span>
                 <span>{totalDaily > 0 ? `−¥${totalDaily.toLocaleString()}` : ''}</span>
                 <span>{totalWithhold > 0 ? `−¥${totalWithhold.toLocaleString()}` : ''}</span>
                 <span className="payout-cell">¥{Math.round(totalPayout).toLocaleString()}</span>
@@ -874,7 +889,7 @@ export default function SalesScreen() {
           </div>
           {isOwner && (
             <div className="mm-note" style={{ paddingTop: 6 }}>
-              本給＝通算時給＋バック。源泉徴収＝(通算時給＋バック)×10%（「源泉徴収する」キャストのみ）。渡す残額＝本給＋大入−日払い−源泉徴収。大入・日払いはキャスト名で突合。
+              本給＝通算時給＋バック。源泉徴収＝(通算時給＋バック)×10%（「源泉徴収する」キャストのみ）。渡す残額＝本給−日払い−源泉徴収（大入は含めない）。日払いはキャスト名で突合。
             </div>
           )}
         </div>
