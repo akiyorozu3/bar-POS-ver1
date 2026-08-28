@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { usePosStore, todayStr, businessDayStart } from '@/store/posStore'
 import { buildMovements } from '@/lib/vault'
+import type { RecurringExpense } from '@/types'
+
+const WDAY = ['日', '月', '火', '水', '木', '金', '土']
 
 // 手動入出金の区分（dir=符号）。その他の入出金は「経費」(±)で記録＝自動反映されるので、
 // ここは経費で表せない分だけ：カード/QR入金（＋）と 給与出金（−）の2つに絞る。
@@ -19,7 +22,8 @@ export default function VaultScreen() {
     transactions, expenses, recurringExpenses, payouts, cashEntries, cashOpening,
     subscribeTransactions, subscribeExpenses, subscribePayouts, subscribeRecurringExpenses,
     subscribeCashEntries, subscribeCashSettings,
-    addCashEntry, deleteCashEntry, saveCashOpening, addExpense,
+    addCashEntry, deleteCashEntry, saveCashOpening, addExpense, deleteExpense,
+    addRecurringExpense, deleteRecurringExpense,
   } = usePosStore()
 
   const today = todayStr()
@@ -94,8 +98,9 @@ export default function VaultScreen() {
     } finally { setBusy(false) }
   }
 
-  // 期首残高の編集
+  // 期首残高・固定費パネル
   const [showOpening, setShowOpening] = useState(false)
+  const [showRecurring, setShowRecurring] = useState(false)
 
   return (
     <div className="vault-screen">
@@ -108,14 +113,25 @@ export default function VaultScreen() {
             <span className="vault-taxheld">うち源泉徴収 預かり（未納） {yen(taxHeld)}</span>
           )}
         </div>
-        <button className="vault-opening-btn" onClick={() => setShowOpening((v) => !v)}>期首残高</button>
+        <div className="vault-head-btns">
+          <button className="vault-opening-btn" onClick={() => setShowRecurring((v) => !v)}>固定費</button>
+          <button className="vault-opening-btn" onClick={() => setShowOpening((v) => !v)}>期首残高</button>
+        </div>
       </div>
 
       {showOpening && <OpeningEditor initBalance={cashOpening.openingBalance} initDate={openingDate} onSave={saveCashOpening} onClose={() => setShowOpening(false)} />}
+      {showRecurring && (
+        <RecurringEditor
+          items={recurringExpenses}
+          onAdd={addRecurringExpense}
+          onDelete={deleteRecurringExpense}
+          onClose={() => setShowRecurring(false)}
+        />
+      )}
 
       {/* 追加フォーム */}
       <div className="vault-add">
-        <div className="vault-add-title">入出金を追加（カード/QR入金・給与出金）</div>
+        <div className="vault-add-title">入出金を追加（カード/QR入金・経費・給与出金 など）</div>
         <div className="vault-add-row">
           <input type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} />
           <select value={cat} onChange={(e) => setCat(e.target.value)}>
@@ -169,8 +185,8 @@ export default function VaultScreen() {
                 <td className="in">{r.amount > 0 ? yen(r.amount) : ''}</td>
                 <td className="out">{r.amount < 0 ? yen(-r.amount) : ''}</td>
                 <td className={r.balance < 0 ? 'minus' : ''}>{yen(r.balance)}</td>
-                <td>{!r.auto && r.entryId && (
-                  <button className="vault-del" onClick={() => deleteCashEntry(r.entryId!)} title="削除">×</button>
+                <td>{(r.entryId || r.expenseId) && (
+                  <button className="vault-del" onClick={() => r.entryId ? deleteCashEntry(r.entryId) : deleteExpense(r.expenseId!)} title="削除">×</button>
                 )}</td>
               </tr>
             ))}
@@ -206,6 +222,68 @@ function OpeningEditor({ initBalance, initDate, onSave, onClose }: {
         <button className="vault-add-btn" onClick={save} disabled={busy}>保存</button>
       </div>
       <div className="vault-hint">※ この日より前の売上・経費は金庫残高に含めません。導入時点の実際の残高を入れてください。</div>
+    </div>
+  )
+}
+
+// 固定費（毎月/毎週の自動計上）エディタ
+function RecurringEditor({ items, onAdd, onDelete, onClose }: {
+  items: RecurringExpense[]
+  onAdd: (item: string, amount: number, cycle: 'monthly' | 'weekly', day: number) => Promise<void>
+  onDelete: (id: string) => Promise<void>
+  onClose: () => void
+}) {
+  const [item, setItem] = useState('')
+  const [sign, setSign] = useState<'out' | 'in'>('out')
+  const [amount, setAmount] = useState('')
+  const [cycle, setCycle] = useState<'monthly' | 'weekly'>('monthly')
+  const [day, setDay] = useState('1')
+  const [busy, setBusy] = useState(false)
+  const add = async () => {
+    const raw = Math.abs(parseInt(amount, 10))
+    const d = parseInt(day, 10)
+    if (!item.trim() || !Number.isFinite(raw) || raw === 0 || !Number.isFinite(d)) return
+    setBusy(true)
+    try { await onAdd(item.trim(), sign === 'out' ? -raw : raw, cycle, d); setItem(''); setAmount('') } finally { setBusy(false) }
+  }
+  return (
+    <div className="vault-opening">
+      <div className="vault-opening-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>固定費（毎月/毎週の自動計上）</span>
+        <button className="shift-thisweek" onClick={onClose}>閉じる</button>
+      </div>
+      <div className="vault-add-row" style={{ flexWrap: 'wrap' }}>
+        <input className="vault-memo" placeholder="品目（例：家賃）" value={item} onChange={(e) => setItem(e.target.value)} />
+        <select value={sign} onChange={(e) => setSign(e.target.value as 'out' | 'in')}>
+          <option value="out">支出 −</option>
+          <option value="in">入金 ＋</option>
+        </select>
+        <input type="number" inputMode="numeric" placeholder="金額" value={amount} onChange={(e) => setAmount(e.target.value)} />
+        <select value={cycle} onChange={(e) => setCycle(e.target.value as 'monthly' | 'weekly')}>
+          <option value="monthly">毎月</option>
+          <option value="weekly">毎週</option>
+        </select>
+        {cycle === 'monthly' ? (
+          <span className="rec-day-wrap"><input className="rec-day-input" type="number" min="1" max="31" value={day} onChange={(e) => setDay(e.target.value)} />日</span>
+        ) : (
+          <select value={day} onChange={(e) => setDay(e.target.value)}>
+            {WDAY.map((w, i) => <option key={i} value={String(i)}>{w}曜</option>)}
+          </select>
+        )}
+        <button className="vault-add-btn" onClick={add} disabled={busy}>追加</button>
+      </div>
+      <div className="vault-hint">登録すると毎月/毎週その分が金庫の残高に自動反映されます（純利益には含めません）。</div>
+      {items.length > 0 && (
+        <div className="vault-rec-list">
+          {items.map((r) => (
+            <div key={r.id} className="vault-rec-row">
+              <span>{r.item}　<span className="vault-rec-when">{r.cycle === 'monthly' ? `毎月${r.day}日` : `毎週${WDAY[r.day]}曜`}</span></span>
+              <span className={r.amount < 0 ? 'out' : 'in'}>{r.amount < 0 ? '−' : '＋'}¥{Math.abs(r.amount).toLocaleString()}</span>
+              <button className="vault-del" onClick={() => onDelete(r.id)} title="削除">×</button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -50,7 +50,7 @@ function periodRange(period: Period, entryDate: string): [Date, Date] {
 }
 
 export default function SalesScreen() {
-  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, backThreshold, saveBackRate, taxRate, taxMode, saveTaxSettings, seats, orders, closedDates, closeDay, reopenDay, entryDate, casts, payouts, subscribePayouts, addPayout, deletePayout, deleteTransaction, restoreTransaction, role, expenses, recurringExpenses, subscribeExpenses, addExpense, deleteExpense, subscribeRecurringExpenses, addRecurringExpense, deleteRecurringExpense, menus, punches, subscribePunches } = usePosStore()
+  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, backThreshold, saveBackRate, taxRate, taxMode, saveTaxSettings, seats, orders, closedDates, closeDay, reopenDay, entryDate, casts, payouts, subscribePayouts, addPayout, deletePayout, deleteTransaction, restoreTransaction, role, expenses, recurringExpenses, subscribeExpenses, subscribeRecurringExpenses, menus, punches, subscribePunches } = usePosStore()
   const isOwner = role === 'owner'
   const [period, setPeriod] = useState<Period>('today')
   const [customFrom, setCustomFrom] = useState(todayStr())
@@ -68,16 +68,6 @@ export default function SalesScreen() {
   const [showProfitPanel, setShowProfitPanel] = useState(false)
   const [profitMode, setProfitMode] = useState<'day' | 'month'>('day')
   const [profitDayMonth, setProfitDayMonth] = useState(() => todayStr().slice(0, 7))  // 日別表示の対象月
-  // 経費
-  const [showExpensePanel, setShowExpensePanel] = useState(false)
-  const [expItem, setExpItem] = useState('')
-  const [expAmount, setExpAmount] = useState('')      // 支出は正の数で入力（内部で−にする）
-  const [expSign, setExpSign] = useState<'out' | 'in'>('out') // out=支出(−) / in=収入(＋)
-  const [recItem, setRecItem] = useState('')
-  const [recAmount, setRecAmount] = useState('')
-  const [recSign, setRecSign] = useState<'out' | 'in'>('out')
-  const [recCycle, setRecCycle] = useState<'monthly' | 'weekly'>('monthly')
-  const [recDay, setRecDay] = useState('1')
   const [closing, setClosing] = useState(false)
   const [cardFee, setCardFee] = useState(String(feeSettings.card))
   const [qrFee, setQrFee] = useState(String(feeSettings.qr))
@@ -243,23 +233,6 @@ export default function SalesScreen() {
     setPayoutAmount('')
   }
 
-  const handleAddExpense = async () => {
-    const raw = Math.abs(parseInt(expAmount, 10))
-    if (!expItem.trim() || !Number.isFinite(raw) || raw === 0) return
-    const signed = expSign === 'out' ? -raw : raw
-    await addExpense(expItem.trim(), signed)
-    setExpItem(''); setExpAmount('')
-  }
-
-  const handleAddRecurring = async () => {
-    const raw = Math.abs(parseInt(recAmount, 10))
-    const day = parseInt(recDay, 10)
-    if (!recItem.trim() || !Number.isFinite(raw) || raw === 0 || !Number.isFinite(day)) return
-    const signed = recSign === 'out' ? -raw : raw
-    await addRecurringExpense(recItem.trim(), signed, recCycle, day)
-    setRecItem(''); setRecAmount('')
-  }
-
   // 完了した会計の編集/削除
   const txClosed = (t: Transaction) => closedDates.includes(dateStrOf(t.completedAt))
   const handleEditTx = (t: Transaction) => {
@@ -378,12 +351,6 @@ export default function SalesScreen() {
         >
           <i className="ti ti-cash-banknote" aria-hidden /> 日払い/大入
         </button>
-        <button
-          className={`top-action-btn ${showExpensePanel ? 'active-s' : ''}`}
-          onClick={() => setShowExpensePanel((v) => !v)}
-        >
-          <i className="ti ti-notes" aria-hidden /> 経費
-        </button>
         {isOwner && (
           <button
             className={`top-action-btn ${showProfitPanel ? 'active-s' : ''}`}
@@ -481,84 +448,6 @@ export default function SalesScreen() {
           </div>
         )}
 
-        {/* 経費パネル（オーナー・マネージャー） */}
-        {showExpensePanel && (
-          <div className="fee-settings">
-            <div className="fee-settings-title">
-              <i className="ti ti-notes" aria-hidden /> 経費（{periodLabel}）
-            </div>
-
-            {/* 単発の経費 */}
-            <div className="mm-add-row" style={{ marginBottom: 6 }}>
-              <input className="mm-add-name" placeholder="品目（例：おしぼり代）" value={expItem} onChange={(e) => setExpItem(e.target.value)} />
-              <select className="mm-add-cat" value={expSign} onChange={(e) => setExpSign(e.target.value as 'out' | 'in')}>
-                <option value="out">支出 −</option>
-                <option value="in">収入 ＋</option>
-              </select>
-              <input className="mm-add-price" type="number" min="0" placeholder="金額" value={expAmount} onChange={(e) => setExpAmount(e.target.value)} />
-              <button className="mm-add-btn" onClick={handleAddExpense} disabled={!expItem.trim() || !expAmount}>＋ 追加</button>
-            </div>
-            <div className="mm-note" style={{ padding: '0 2px 6px' }}>全て現金前提です（実際の入金合計と金庫現金の両方に反映）。＋追加は {closeDate.replace(/-/g, '/')} に記録されます</div>
-            {expenses.length === 0 ? (
-              <div className="mm-empty" style={{ padding: 10 }}>{periodLabel}の経費はありません</div>
-            ) : expenses.map((e) => (
-              <div className="close-row" key={e.id}>
-                <span>
-                  {period !== 'today' && <span className="payout-date">{e.date.slice(5).replace('-', '/')}</span>}
-                  {e.item}
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className={e.amount < 0 ? 'fee-amt' : 'net-amt'}>{e.amount < 0 ? '−' : '＋'}¥{Math.abs(e.amount).toLocaleString()}</span>
-                  <button className="mm-row-del" onClick={() => deleteExpense(e.id)}>削除</button>
-                </span>
-              </div>
-            ))}
-
-            {/* 固定費（定期） */}
-            <div className="fee-settings-title" style={{ marginTop: 12 }}>
-              <i className="ti ti-repeat" aria-hidden /> 固定費（定期）
-            </div>
-            <div className="mm-note" style={{ padding: '0 2px 6px' }}>登録すると毎月/毎週その分が自動で反映されます（該当日はレジの金庫現金からも控除）。</div>
-            <div className="mm-add-row" style={{ marginBottom: 6, flexWrap: 'wrap' }}>
-              <input className="mm-add-name" placeholder="品目（例：家賃）" value={recItem} onChange={(e) => setRecItem(e.target.value)} />
-              <select className="mm-add-cat" value={recSign} onChange={(e) => setRecSign(e.target.value as 'out' | 'in')}>
-                <option value="out">支出 −</option>
-                <option value="in">収入 ＋</option>
-              </select>
-              <input className="mm-add-price" type="number" min="0" placeholder="金額" value={recAmount} onChange={(e) => setRecAmount(e.target.value)} />
-              <select className="mm-add-cat" value={recCycle} onChange={(e) => setRecCycle(e.target.value as 'monthly' | 'weekly')}>
-                <option value="monthly">毎月</option>
-                <option value="weekly">毎週</option>
-              </select>
-              {recCycle === 'monthly' ? (
-                <span className="rec-day-wrap"><input className="rec-day-input" type="number" min="1" max="31" value={recDay} onChange={(e) => setRecDay(e.target.value)} />日</span>
-              ) : (
-                <select className="mm-add-cat" value={recDay} onChange={(e) => setRecDay(e.target.value)}>
-                  {['日', '月', '火', '水', '木', '金', '土'].map((w, i) => <option key={i} value={String(i)}>{w}曜</option>)}
-                </select>
-              )}
-              <button className="mm-add-btn" onClick={handleAddRecurring} disabled={!recItem.trim() || !recAmount}>＋ 追加</button>
-            </div>
-            {recurringExpenses.map((r) => (
-              <div className="close-row" key={r.id}>
-                <span>
-                  {r.item}
-                  <span className="payout-date">{r.cycle === 'monthly' ? `毎月${r.day}日` : `毎週${['日', '月', '火', '水', '木', '金', '土'][r.day]}曜`}</span>
-                  <span className="exp-tag">{periodLabel}{recurringOccurrences(r)}回</span>
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className={r.amount < 0 ? 'fee-amt' : 'net-amt'}>{r.amount < 0 ? '−' : '＋'}¥{Math.abs(r.amount).toLocaleString()}</span>
-                  <button className="mm-row-del" onClick={() => deleteRecurringExpense(r.id)}>削除</button>
-                </span>
-              </div>
-            ))}
-
-            <div className="close-row total" style={{ marginTop: 8 }}>
-              <span>経費合計（{periodLabel}・実際の入金合計に反映）</span>
-              <span className={expenseTotal < 0 ? 'fee-amt' : 'net-amt'}>{expenseTotal < 0 ? '−' : '＋'}¥{Math.abs(expenseTotal).toLocaleString()}</span>
-            </div>
-          </div>
-        )}
 
         {/* 純利益パネル（オーナーのみ） */}
         {showProfitPanel && isOwner && (
@@ -584,7 +473,7 @@ export default function SalesScreen() {
               <div className={`profit-summary-val ${(shownMonthProfit?.profit ?? 0) < 0 ? 'minus' : ''}`}>¥{(shownMonthProfit?.profit ?? 0).toLocaleString()}</div>
               <div className="profit-summary-sub">
                 {shownMonthProfit
-                  ? `実入金 ¥${shownMonthProfit.sales.toLocaleString()} − 人件費 ¥${shownMonthProfit.labor.toLocaleString()} − バック ¥${shownMonthProfit.back.toLocaleString()} − 大入 ¥${shownMonthProfit.oiri.toLocaleString()}${shownMonthProfit.expense < 0 ? ' − 経費 ¥' + Math.abs(shownMonthProfit.expense).toLocaleString() : shownMonthProfit.expense > 0 ? ' ＋ 経費 ¥' + shownMonthProfit.expense.toLocaleString() : ''}`
+                  ? `実入金 ¥${shownMonthProfit.sales.toLocaleString()} − 人件費 ¥${shownMonthProfit.labor.toLocaleString()} − バック ¥${shownMonthProfit.back.toLocaleString()} − 大入 ¥${shownMonthProfit.oiri.toLocaleString()}（経費は含まず／金庫で管理）`
                   : `${shownMonthLabel}のデータはまだありません`}
               </div>
             </div>
@@ -592,45 +481,27 @@ export default function SalesScreen() {
             <div className="profit-table-wrap">
               <div className="profit-table">
                 <div className="profit-head">
-                  <span>{profitMode === 'day' ? '日付' : '月'}</span><span>売上</span><span>人件費</span><span>バック</span><span>大入</span><span>日払い</span><span>経費</span><span>純利益</span>
+                  <span>{profitMode === 'day' ? '日付' : '月'}</span><span>売上</span><span>人件費</span><span>バック</span><span>大入</span><span>日払い</span><span>純利益</span>
                 </div>
                 {pd.loading ? (
                   <div className="mm-empty" style={{ padding: 12 }}>読み込み中...</div>
                 ) : profitRows.length === 0 ? (
                   <div className="mm-empty" style={{ padding: 12 }}>データがありません</div>
-                ) : profitRows.map((r) => {
-                  const isDay = profitMode === 'day'
-                  // 日別は経費を各日に載せず、純利益＝実入金−人件費−バック−大入（経費除く）。経費は最下行に当月合計。
-                  const dispProfit = isDay ? r.profit - r.expense : r.profit
-                  return (
-                  <div className="profit-row" key={r.key}>
-                    <span className="profit-key">{isDay ? r.key.slice(5).replace('-', '/') : r.key.replace('-', '/')}</span>
+                ) : profitRows.map((r) => (
+                  <div className="profit-row profit-row-6" key={r.key}>
+                    <span className="profit-key">{profitMode === 'day' ? r.key.slice(5).replace('-', '/') : r.key.replace('-', '/')}</span>
                     <span>¥{r.sales.toLocaleString()}</span>
                     <span className="minus">{r.labor ? `−¥${r.labor.toLocaleString()}` : '—'}</span>
                     <span className="minus">{r.back ? `−¥${r.back.toLocaleString()}` : '—'}</span>
                     <span className="minus">{r.oiri ? `−¥${r.oiri.toLocaleString()}` : '—'}</span>
                     <span className="muted">{r.dailyPay ? `(¥${r.dailyPay.toLocaleString()})` : '—'}</span>
-                    <span className={!isDay && r.expense < 0 ? 'minus' : ''}>{isDay ? '—' : (r.expense ? `${r.expense < 0 ? '−' : '＋'}¥${Math.abs(r.expense).toLocaleString()}` : '—')}</span>
-                    <span className={`profit-val ${dispProfit < 0 ? 'minus' : ''}`}>¥{dispProfit.toLocaleString()}</span>
+                    <span className={`profit-val ${r.profit < 0 ? 'minus' : ''}`}>¥{r.profit.toLocaleString()}</span>
                   </div>
-                  )
-                })}
-                {profitMode === 'day' && profitRows.length > 0 && (
-                  <div className="profit-row profit-expense-row">
-                    <span className="profit-key">経費（当月）</span>
-                    <span /><span /><span /><span /><span />
-                    <span className={(shownMonthProfit?.expense ?? 0) < 0 ? 'minus' : ''}>
-                      {(() => { const me = shownMonthProfit?.expense ?? 0; return me ? `${me < 0 ? '−' : '＋'}¥${Math.abs(me).toLocaleString()}` : '¥0' })()}
-                    </span>
-                    <span />
-                  </div>
-                )}
+                ))}
               </div>
             </div>
             <div className="mm-note" style={{ paddingTop: 6 }}>
-              {profitMode === 'day'
-                ? '日別の純利益は経費を除いた額です（実入金−人件費−バック−大入）。経費は当月合計を最下行に表示。月別は経費込み。日払いは前払い分なので差し引かず参考表示（括弧）。'
-                : '純利益＝実入金−人件費−バック−大入＋経費。日払いは人件費/バックの前払い分なので差し引かず参考表示（括弧）。人件費＝時給×打刻の勤務時間（退勤済みの分のみ）。'}
+              純利益＝実入金−人件費−バック−大入（経費は含めません＝営業の儲け。家賃などの経費は「金庫」で現金として管理）。日払いは前払い分なので差し引かず参考表示（括弧）。人件費＝時給×打刻の勤務時間（退勤済みの分のみ）。
             </div>
           </div>
         )}

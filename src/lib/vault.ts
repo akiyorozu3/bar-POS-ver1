@@ -18,7 +18,8 @@ export interface Movement {
   kind: MovementKind
   amount: number        // 符号込み（＋入金 / −出金）
   auto: boolean         // true=自動（削除不可）/ false=手動
-  entryId?: string      // 手動のとき、削除用のドキュメントID
+  entryId?: string      // 手動入出金(cashEntries)の削除用ID
+  expenseId?: string    // 単発経費(expenses)の削除用ID
 }
 
 interface BuildParams {
@@ -60,10 +61,10 @@ export function buildMovements(p: BuildParams): Movement[] {
   }
   for (const [d, sum] of cashByDay) out.push({ date: d, label: '現金売上', kind: 'cash-sales', amount: sum, auto: true })
 
-  // ② 経費（単発・符号込み。−が支出）
+  // ② 経費（単発・符号込み。−が支出）。金庫から削除できるよう id を持たせる（auto扱いにしない）
   for (const e of p.expenses) {
     if (!inRange(e.date)) continue
-    out.push({ date: e.date, label: e.item || '経費', kind: 'expense', amount: e.amount, auto: true })
+    out.push({ date: e.date, label: e.item || '経費', kind: 'expense', amount: e.amount, auto: false, expenseId: e.id })
   }
 
   // ③ 固定費（期間内の該当日に計上）

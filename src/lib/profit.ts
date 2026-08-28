@@ -107,13 +107,14 @@ export function computeProfit(p: Params): { days: ProfitRow[]; months: ProfitRow
     oiri: Math.round(a.oiri),
     dailyPay: Math.round(a.dailyPay),
     expense: Math.round(a.expense),
-    profit: Math.round(a.sales - a.labor - a.back - a.oiri + a.expense),
+    // 純利益は経費を含めない（＝営業の儲け。経費・家賃等は金庫で現金として管理）
+    profit: Math.round(a.sales - a.labor - a.back - a.oiri),
   })
 
-  // 日別（何かしら値のある日だけ、新しい順）
+  // 日別（何かしら値のある日だけ、新しい順）。経費だけの日は純利益に出さない（金庫で見る）
   const days = [...byDay.entries()]
     .map(([k, a]) => toRow(k, a))
-    .filter((r) => r.sales || r.labor || r.back || r.oiri || r.dailyPay || r.expense)
+    .filter((r) => r.sales || r.labor || r.back || r.oiri || r.dailyPay)
     .sort((x, y) => y.key.localeCompare(x.key))
 
   // 月別（日別を YYYY-MM で合算）
