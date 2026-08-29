@@ -149,11 +149,13 @@ export default function ShiftScreen() {
                 return (
                   <tr key={c.id}>
                     <th className="sh-name">
-                      <span className="sh-move">
-                        <button className="sh-move-btn" onClick={() => moveRow(c.id, -1)} disabled={ri === 0} aria-label="上へ">▲</button>
-                        <button className="sh-move-btn" onClick={() => moveRow(c.id, 1)} disabled={ri === casts.length - 1} aria-label="下へ">▼</button>
-                      </span>
-                      <span className="sh-name-label">{castLabel(c)}</span>
+                      <div className="sh-name-inner">
+                        <span className="sh-move">
+                          <button className="sh-move-btn" onClick={() => moveRow(c.id, -1)} disabled={ri === 0} aria-label="上へ">▲</button>
+                          <button className="sh-move-btn" onClick={() => moveRow(c.id, 1)} disabled={ri === casts.length - 1} aria-label="下へ">▼</button>
+                        </span>
+                        <span className="sh-name-label">{castLabel(c)}</span>
+                      </div>
                     </th>
                     {dates.map((d) => {
                       const ds = ymd(d)
