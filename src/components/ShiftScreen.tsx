@@ -29,6 +29,8 @@ export default function ShiftScreen() {
   const [monday, setMonday] = useState<Date>(() => weekMonday(new Date()))
   const [editing, setEditing] = useState<EditTarget | null>(null)
   const [sharing, setSharing] = useState(false)
+  // コピー中のシフト（Excelのコピー感覚：コピー後、貼り付けたいセルをタップで適用）
+  const [clip, setClip] = useState<{ startTime: string; endTime: string; role: 'open' | 'close' | null } | null>(null)
 
   const dates = useMemo(() => weekDates(monday), [monday])
   const fromStr = ymd(dates[0])
@@ -123,6 +125,18 @@ export default function ShiftScreen() {
         <div className="shift-alert">⚠ OP・CL が未定の日があります（黄色いセル）。確定・通知の前に割り当ててください。</div>
       )}
 
+      {clip && (
+        <div className="shift-clip">
+          <span className="shift-clip-info">
+            コピー中：{clip.startTime}〜{clip.endTime}
+            {clip.role === 'open' && <span className="sh-role op">OP</span>}
+            {clip.role === 'close' && <span className="sh-role cl">CL</span>}
+          </span>
+          <span className="shift-clip-hint">貼り付けたいセルをタップ</span>
+          <button className="shift-clip-clear" onClick={() => setClip(null)}>解除</button>
+        </div>
+      )}
+
       {casts.length === 0 ? (
         <div className="empty-today">キャストが登録されていません。「キャスト管理」から追加してください。</div>
       ) : (
@@ -163,8 +177,10 @@ export default function ShiftScreen() {
                       return (
                         <td
                           key={ds}
-                          className={`sh-cell ${s ? 'on' : 'off'} ${ds === today ? 'today' : ''}`}
-                          onClick={() => setEditing({ castId: c.id, castName: castLabel(c), date: ds, dateLabel: dayLabel(d) })}
+                          className={`sh-cell ${s ? 'on' : 'off'} ${ds === today ? 'today' : ''} ${clip ? 'pasting' : ''}`}
+                          onClick={() => clip
+                            ? saveShift(c.id, ds, clip)
+                            : setEditing({ castId: c.id, castName: castLabel(c), date: ds, dateLabel: dayLabel(d) })}
                         >
                           {s ? (
                             <>
@@ -204,7 +220,7 @@ export default function ShiftScreen() {
         </div>
       )}
 
-      <p className="shift-hint">セルをタップして出勤時間・OP/CL を編集。休みにするには「休みにする」。</p>
+      <p className="shift-hint">セルをタップして編集。「コピー」→ 貼り付けたいセルをタップで同じ時間を素早く入力。休みは「休みにする」。</p>
 
       {editing && (
         <ShiftEditModal
@@ -213,6 +229,7 @@ export default function ShiftScreen() {
           onClose={() => setEditing(null)}
           onSave={async (data) => { await saveShift(editing.castId, editing.date, data); setEditing(null) }}
           onDelete={async () => { await deleteShift(editing.castId, editing.date); setEditing(null) }}
+          onCopy={(data) => { setClip(data); setEditing(null) }}
         />
       )}
     </div>
@@ -220,12 +237,13 @@ export default function ShiftScreen() {
 }
 
 // ── セル編集モーダル ─────────────────────────────
-function ShiftEditModal({ target, existing, onClose, onSave, onDelete }: {
+function ShiftEditModal({ target, existing, onClose, onSave, onDelete, onCopy }: {
   target: EditTarget
   existing: ScheduledShift | null
   onClose: () => void
   onSave: (data: { startTime: string; endTime: string; role: 'open' | 'close' | null }) => Promise<void>
   onDelete: () => Promise<void>
+  onCopy: (data: { startTime: string; endTime: string; role: 'open' | 'close' | null }) => void
 }) {
   const [start, setStart] = useState(existing?.startTime ?? '19:00')
   const [end, setEnd] = useState(existing?.endTime ?? '23:00')
@@ -261,6 +279,10 @@ function ShiftEditModal({ target, existing, onClose, onSave, onDelete }: {
           <button className={`shift-role-btn op ${role === 'open' ? 'sel' : ''}`} onClick={() => setRole('open')}>OP（オープン）</button>
           <button className={`shift-role-btn cl ${role === 'close' ? 'sel' : ''}`} onClick={() => setRole('close')}>CL（クローズ）</button>
         </div>
+
+        <button className="shift-copy-btn" onClick={() => { if (start && end) onCopy({ startTime: start, endTime: end, role }) }} disabled={busy || !start || !end}>
+          この時間をコピー → 他のセルに貼り付け
+        </button>
 
         <div className="modal-btns" style={{ marginTop: 12 }}>
           {existing && (

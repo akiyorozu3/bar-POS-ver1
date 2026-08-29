@@ -503,6 +503,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .sh-cell.off { color: #bbb; }
 .sh-cell.today { outline: 1.5px solid #93c5fd; outline-offset: -2px; }
 .sh-cell:hover { background: #e2eefc; }
+.sh-cell.pasting { cursor: copy; }
+.sh-cell.pasting:hover { background: #dcf3e3; outline: 1.5px dashed #4a9d6a; outline-offset: -2px; }
+/* コピー中バー */
+.shift-clip { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; background: #eef8f1; border: 0.5px solid #4a9d6a; border-radius: 8px; padding: 8px 12px; }
+.shift-clip-info { font-size: 12px; font-weight: 600; color: #1f7a3d; display: inline-flex; align-items: center; gap: 4px; }
+.shift-clip-hint { font-size: 11px; color: #5f5e5a; }
+.shift-clip-clear { margin-left: auto; padding: 4px 12px; border-radius: 6px; border: 0.5px solid #a32d2d; background: #fff; color: #a32d2d; font-size: 11px; cursor: pointer; font-family: inherit; }
+.shift-copy-btn { width: 100%; margin-top: 12px; padding: 9px; border-radius: 8px; border: 0.5px solid #4a9d6a; background: #eef8f1; color: #1f7a3d; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.shift-copy-btn:disabled { opacity: .5; cursor: not-allowed; }
 .sh-time { display: inline-block; font-weight: 500; color: #1a1a18; }
 .sh-off { color: #c9c7c1; }
 .sh-role { display: inline-block; margin-left: 4px; font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 4px; vertical-align: middle; }
