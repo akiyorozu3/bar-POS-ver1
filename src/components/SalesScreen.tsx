@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { usePosStore, todayStr, dateStrOf, businessDayStart, businessDayEnd } from '@/store/posStore'
-import type { Transaction, RecurringExpense } from '@/types'
+import type { Transaction } from '@/types'
 import { useSalesSummary } from '@/hooks/useSalesSummary'
 import { buildTransactionCSV, buildCastCSV, downloadCSV } from '@/lib/csv'
 import { castLabel, wageOn } from '@/lib/cast'
@@ -179,21 +179,6 @@ export default function SalesScreen() {
   const dailyPayTotal = dayPayouts.filter((p) => p.type === 'daily').reduce((a, p) => a + p.amount, 0)
   const oiriTotal = dayPayouts.filter((p) => p.type === 'oiri').reduce((a, p) => a + p.amount, 0)
 
-  // 経費：金額は符号込み（＋収入 / −支出）。実際の入金合計に反映。
-  const [pFrom, pTo] = rangeOf()
-  const fromStr = dateStrOf(pFrom.getTime())
-  const toStr = dateStrOf(pTo.getTime())
-  const recurringOccurrences = (rec: RecurringExpense): number => {
-    let count = 0
-    const end = new Date(`${toStr}T12:00:00`)
-    for (const d = new Date(`${fromStr}T12:00:00`); d <= end; d.setDate(d.getDate() + 1)) {
-      if (rec.cycle === 'monthly' ? d.getDate() === rec.day : d.getDay() === rec.day) count++
-    }
-    return count
-  }
-  const oneoffExpenseTotal = expenses.reduce((a, e) => a + e.amount, 0)
-  const recurringExpenseTotal = recurringExpenses.reduce((a, r) => a + r.amount * recurringOccurrences(r), 0)
-  const expenseTotal = oneoffExpenseTotal + recurringExpenseTotal   // 符号込み
   // 金庫現金：全て現金前提。ヘッダー日の単発経費＋その日に該当する固定費を反映。
   const dayOneoff = expenses.filter((e) => e.date === closeDate).reduce((a, e) => a + e.amount, 0)
   const closeD = new Date(`${closeDate}T12:00:00`)
@@ -204,8 +189,8 @@ export default function SalesScreen() {
   const dayExpense = dayOneoff + dayRecurring
 
   const safeCash = summary.byMethod.cash.sales - dailyPayTotal - oiriTotal + dayExpense
-  // 実際の入金合計（実入金 − 日払い/大入 ＋ 経費符号込み）
-  const netAfterAll = summary.totalNet - periodPayoutTotal + expenseTotal
+  // 実際の入金合計（実入金 − 日払い/大入）。経費は含めない（経費は金庫で管理）
+  const netAfterAll = summary.totalNet - periodPayoutTotal
 
   // 純利益（日別/月別）：期間トグルとは独立に直近6ヶ月を取得して月比較できるようにする
   const pd = useProfitData(6, showProfitPanel)
@@ -670,7 +655,6 @@ export default function SalesScreen() {
               {(() => {
                 const parts = [`一人客 ${summary.soloCount}件`]
                 if (periodPayoutTotal > 0) parts.push(`日払い・大入 −¥${periodPayoutTotal.toLocaleString()}`)
-                if (expenseTotal !== 0) parts.push(`経費 ${expenseTotal < 0 ? '−' : '＋'}¥${Math.abs(expenseTotal).toLocaleString()}`)
                 return parts.join(' ／ ')
               })()}
             </div>
