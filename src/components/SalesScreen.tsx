@@ -480,28 +480,39 @@ export default function SalesScreen() {
 
             <div className="profit-table-wrap">
               <div className="profit-table">
-                <div className="profit-head">
-                  <span>{profitMode === 'day' ? '日付' : '月'}</span><span>売上</span><span>人件費</span><span>バック</span><span>大入</span><span>日払い</span><span>純利益</span>
+                <div className={`profit-head ${profitMode === 'day' ? 'day' : ''}`}>
+                  <span>{profitMode === 'day' ? '日付' : '月'}</span><span>売上</span><span>人件費</span><span>バック</span><span>大入</span><span>日払い</span>{profitMode === 'day' && <span>経費</span>}<span>純利益</span>
                 </div>
                 {pd.loading ? (
                   <div className="mm-empty" style={{ padding: 12 }}>読み込み中...</div>
                 ) : profitRows.length === 0 ? (
                   <div className="mm-empty" style={{ padding: 12 }}>データがありません</div>
                 ) : profitRows.map((r) => (
-                  <div className="profit-row profit-row-6" key={r.key}>
+                  <div className={`profit-row ${profitMode === 'day' ? 'day' : ''}`} key={r.key}>
                     <span className="profit-key">{profitMode === 'day' ? r.key.slice(5).replace('-', '/') : r.key.replace('-', '/')}</span>
                     <span>¥{r.sales.toLocaleString()}</span>
                     <span className="minus">{r.labor ? `−¥${r.labor.toLocaleString()}` : '—'}</span>
                     <span className="minus">{r.back ? `−¥${r.back.toLocaleString()}` : '—'}</span>
                     <span className="minus">{r.oiri ? `−¥${r.oiri.toLocaleString()}` : '—'}</span>
                     <span className="muted">{r.dailyPay ? `(¥${r.dailyPay.toLocaleString()})` : '—'}</span>
+                    {profitMode === 'day' && <span className="muted">—</span>}
                     <span className={`profit-val ${r.profit < 0 ? 'minus' : ''}`}>¥{r.profit.toLocaleString()}</span>
                   </div>
                 ))}
+                {profitMode === 'day' && profitRows.length > 0 && (
+                  <div className="profit-row day profit-expense-row">
+                    <span className="profit-key">経費（当月）</span>
+                    <span /><span /><span /><span /><span />
+                    <span className={(shownMonthProfit?.expense ?? 0) < 0 ? 'minus' : ''}>
+                      {(() => { const me = shownMonthProfit?.expense ?? 0; return me ? `${me < 0 ? '−' : '＋'}¥${Math.abs(me).toLocaleString()}` : '¥0' })()}
+                    </span>
+                    <span />
+                  </div>
+                )}
               </div>
             </div>
             <div className="mm-note" style={{ paddingTop: 6 }}>
-              純利益＝実入金−人件費−バック−大入（経費は含めません＝営業の儲け。家賃などの経費は「金庫」で現金として管理）。日払いは前払い分なので差し引かず参考表示（括弧）。人件費＝時給×打刻の勤務時間（退勤済みの分のみ）。
+              純利益＝実入金−人件費−バック−大入（経費は含めません＝営業の儲け。経費は「金庫」で現金として管理）。日別は経費を各日に載せず、当月合計を最下行に表示。日払いは前払い分なので差し引かず参考表示（括弧）。
             </div>
           </div>
         )}
