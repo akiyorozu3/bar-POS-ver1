@@ -141,7 +141,7 @@ export default function App() {
             <button className="topbar-date-today" onClick={() => setEntryDate(todayStr())}>今日に戻す</button>
           )}
         </label>
-        {(isOwner || PUNCH_STAFF_ENABLED) && (
+        {(isOwner || (PUNCH_STAFF_ENABLED && role === 'staff')) && (
           <button className="punch-open-btn" onClick={() => setShowPunch(true)}>
             <i className="ti ti-clock" aria-hidden /> 打刻
           </button>
