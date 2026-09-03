@@ -133,7 +133,9 @@ export default function SalesScreen() {
     else e.daily += p.amount
     payoutByName.set(p.name, e)
   }
-  const castByName = new Map(casts.map((c) => [castLabel(c), c]))
+  // 名前→キャスト（改名前の別名も引けるように）。源泉徴収の判定で過去名義の行にも設定が効く。
+  const castByName = new Map<string, typeof casts[number]>()
+  for (const c of casts) for (const n of [castLabel(c), ...(c.aliases ?? [])]) if (n) castByName.set(n, c)
   // 源泉徴収＝(通算時給＋バック)×0.1。「源泉徴収する」キャストのみ・円未満切り捨て。
   const withholdOf = (name: string, honkyu: number) =>
     castByName.get(name)?.withholding ? Math.floor(honkyu * 0.1) : 0

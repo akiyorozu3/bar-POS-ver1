@@ -17,8 +17,10 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
   const menus = usePosStore((s) => s.menus)                  // 保険用：現行メニューの円バック参照
   const casts = usePosStore((s) => s.casts)                  // バック集計しないキャスト判定用
   return useMemo(() => {
-    // バック集計しないキャスト（名前で判定）。卓バック・ドリンクバックを0扱いにする。
-    const noBackNames = new Set(casts.filter((c) => c.noBack).map((c) => (c.name || c.realName || '').trim()))
+    // バック集計しないキャスト（名前で判定・改名前の別名も含む）。卓バック・ドリンクバックを0扱いにする。
+    const noBackNames = new Set(
+      casts.filter((c) => c.noBack).flatMap((c) => [(c.name || c.realName || '').trim(), ...(c.aliases ?? [])])
+    )
     // 保険：明細に円バックが焼き付いていない場合、現行メニューの円バックを商品名で引く。
     // （端末が古い等で焼き付け漏れが起きても、ドリンクバックが0円にならないようにする）
     const menuDrinkBack = new Map<string, number>()

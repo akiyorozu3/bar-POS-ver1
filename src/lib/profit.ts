@@ -61,8 +61,8 @@ export function computeProfit(p: Params): { days: ProfitRow[]; months: ProfitRow
   const menuBack = new Map<string, number>()
   for (const m of p.menus) if (m.category === DRINK && m.drinkBack != null) menuBack.set(m.name, m.drinkBack)
   const castById = new Map(p.casts.map((c) => [c.id, c]))
-  // バック集計しないキャスト（名前判定）。純利益のバックからも除外して集計と一致させる。
-  const noBackNames = new Set(p.casts.filter((c) => c.noBack).map((c) => castLabel(c)))
+  // バック集計しないキャスト（名前判定・改名前の別名も含む）。純利益のバックからも除外して集計と一致させる。
+  const noBackNames = new Set(p.casts.filter((c) => c.noBack).flatMap((c) => [castLabel(c), ...(c.aliases ?? [])]))
 
   const byDay = new Map<string, Agg>()
   const day = (k: string) => { let a = byDay.get(k); if (!a) { a = emptyAgg(); byDay.set(k, a) } return a }

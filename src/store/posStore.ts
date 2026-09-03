@@ -113,7 +113,7 @@ interface PosState {
   // キャスト管理（オーナーのみ）
   subscribeCasts: () => () => void
   addCast: (nickname: string, realName: string, hourlyWage?: number) => Promise<void>
-  updateCast: (id: string, patch: { name?: string; realName?: string; hourlyWage?: number; active?: boolean; withholding?: boolean; noBack?: boolean; wageHistory?: { from: string; wage: number }[] }) => Promise<void>
+  updateCast: (id: string, patch: { name?: string; realName?: string; hourlyWage?: number; active?: boolean; withholding?: boolean; noBack?: boolean; wageHistory?: { from: string; wage: number }[]; aliases?: string[] }) => Promise<void>
   deleteCast: (id: string) => Promise<void>
   moveCast: (id: string, dir: -1 | 1) => Promise<void>
   seedDefaultCasts: () => Promise<void>
@@ -376,7 +376,17 @@ export const usePosStore = create<PosState>((set, get) => {
   },
 
   updateCast: async (id, patch) => {
-    await updateDoc(doc(db, COLLECTIONS.CASTS, id), patch)
+    const p: typeof patch = { ...patch }
+    // 改名時は旧名を別名(aliases)に自動記録 → 過去名義の集計にも設定(源泉/バック)が効く
+    if (p.name != null) {
+      const cur = get().casts.find((c) => c.id === id)
+      const oldName = (cur?.name ?? '').trim()
+      const newName = p.name.trim()
+      if (cur && oldName && oldName !== newName) {
+        p.aliases = Array.from(new Set([...(cur.aliases ?? []), oldName])).filter((n) => n && n !== newName)
+      }
+    }
+    await updateDoc(doc(db, COLLECTIONS.CASTS, id), p)
   },
 
   deleteCast: async (id) => {
