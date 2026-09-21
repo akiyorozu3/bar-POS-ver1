@@ -338,14 +338,12 @@ export default function SalesScreen() {
         >
           <i className="ti ti-cash-banknote" aria-hidden /> 日払い/大入
         </button>
-        {isOwner && (
-          <button
-            className={`top-action-btn ${showProfitPanel ? 'active-s' : ''}`}
-            onClick={() => setShowProfitPanel((v) => !v)}
-          >
-            <i className="ti ti-trending-up" aria-hidden /> 純利益
-          </button>
-        )}
+        <button
+          className={`top-action-btn ${showProfitPanel ? 'active-s' : ''}`}
+          onClick={() => setShowProfitPanel((v) => !v)}
+        >
+          <i className="ti ti-trending-up" aria-hidden /> 純利益
+        </button>
         {isOwner && (
           <button
             className={`top-action-btn ${showClosePanel ? 'active-s' : ''} ${dateClosed ? 'closed' : ''}`}
@@ -436,8 +434,8 @@ export default function SalesScreen() {
         )}
 
 
-        {/* 純利益パネル（オーナーのみ） */}
-        {showProfitPanel && isOwner && (
+        {/* 純利益パネル（オーナー・マネージャー） */}
+        {showProfitPanel && (
           <div className="fee-settings">
             <div className="fee-settings-title">
               <i className="ti ti-trending-up" aria-hidden /> 純利益（直近6ヶ月）
