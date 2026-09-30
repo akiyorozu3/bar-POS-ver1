@@ -49,6 +49,7 @@ export default function App() {
 
   const isOwner = role === 'owner'
   const canSales = role === 'owner' || role === 'manager'   // 売上管理を開ける権限
+  const canChangeDate = role !== 'staff'                    // ヘッダー日付の変更は owner/manager のみ（staffは常に今日）
   const backdated = entryDate !== todayStr()
   // ヘッダー日付を ±1日ずらす（未来日は不可）
   const shiftEntryDate = (delta: number) => {
@@ -89,6 +90,11 @@ export default function App() {
     if ((screen === 'menu' || screen === 'cast' || screen === 'punchmgr') && !isOwner) setScreen('order')
   }, [isOwner, canSales, screen])
 
+  // スタッフは日付変更不可＝常に今日に固定（万一ずれていたら戻す）
+  useEffect(() => {
+    if (role === 'staff' && entryDate !== todayStr()) setEntryDate(todayStr())
+  }, [role, entryDate, setEntryDate])
+
   // 会計へ遷移イベント（OrderScreen から発火）
   useEffect(() => {
     const toCheckout = () => setScreen('checkout')
@@ -126,19 +132,25 @@ export default function App() {
           {role === 'owner' ? 'オーナー' : role === 'manager' ? 'マネージャー' : 'スタッフ'}
         </span>
         <label className="topbar-date">
-          <span className="topbar-date-lbl">{backdated ? '遡及入力 ⚠' : '日付'}</span>
-          <span className="topbar-date-nav">
-            <button className="date-step" onClick={() => shiftEntryDate(-1)} title="前の日" aria-label="前の日">‹</button>
-            <input
-              type="date"
-              value={entryDate}
-              max={todayStr()}
-              onChange={(e) => setEntryDate(e.target.value)}
-            />
-            <button className="date-step" onClick={() => shiftEntryDate(1)} disabled={!backdated} title="次の日" aria-label="次の日">›</button>
-          </span>
-          {backdated && (
-            <button className="topbar-date-today" onClick={() => setEntryDate(todayStr())}>今日に戻す</button>
+          <span className="topbar-date-lbl">{canChangeDate && backdated ? '遡及入力 ⚠' : '日付'}</span>
+          {canChangeDate ? (
+            <>
+              <span className="topbar-date-nav">
+                <button className="date-step" onClick={() => shiftEntryDate(-1)} title="前の日" aria-label="前の日">‹</button>
+                <input
+                  type="date"
+                  value={entryDate}
+                  max={todayStr()}
+                  onChange={(e) => setEntryDate(e.target.value)}
+                />
+                <button className="date-step" onClick={() => shiftEntryDate(1)} disabled={!backdated} title="次の日" aria-label="次の日">›</button>
+              </span>
+              {backdated && (
+                <button className="topbar-date-today" onClick={() => setEntryDate(todayStr())}>今日に戻す</button>
+              )}
+            </>
+          ) : (
+            <span className="topbar-date-fixed">{todayStr()}</span>
           )}
         </label>
         {(isOwner || (PUNCH_STAFF_ENABLED && role === 'staff')) && (

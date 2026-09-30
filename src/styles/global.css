@@ -338,6 +338,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .topbar.backdated .topbar-date input { background: #fff; color: #1a1a18; border-color: #ffce85; }
 .topbar-date-today { font-size: 10px; padding: 2px 8px; border-radius: 10px; border: none; background: #fff; color: #854f0b; cursor: pointer; font-family: inherit; font-weight: 500; white-space: nowrap; }
 .topbar-date-nav { display: inline-flex; align-items: center; gap: 3px; }
+.topbar-date-fixed { font-size: 12px; padding: 2px 8px; border-radius: 6px; background: #2a2a28; color: #fff; font-variant-numeric: tabular-nums; }
 .date-step { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 16px; line-height: 1; border-radius: 6px; border: 0.5px solid #555; background: #2a2a28; color: #fff; cursor: pointer; font-family: inherit; padding: 0; }
 .date-step:disabled { opacity: .35; cursor: not-allowed; }
 .topbar.backdated .date-step { background: #fff; color: #1a1a18; border-color: #ffce85; }
