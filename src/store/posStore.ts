@@ -529,10 +529,13 @@ export const usePosStore = create<PosState>((set, get) => {
 
   // ── 会計確定 → Firestore書き込み ─────────────
   completePayment: async (seatId, payMethod, _cashReceived, splits) => {
-    const { seats, orders, feeSettings, taxRate, taxMode, entryDate, closedDates, backThreshold } = get()
+    const { seats, orders, feeSettings, taxRate, taxMode, entryDate, closedDates, backThreshold, role } = get()
+    // 記録先の営業日。スタッフは遡及できない＝常にその時点の営業日(todayStr)で記録する。
+    // （アプリを17時前から開きっぱなしで entryDate が前営業日のまま固定され、夜の会計が前日に入る不具合の防止）
+    const bookDate = role === 'staff' ? todayStr() : entryDate
     // 締め済みの日付には記録できない
-    if (closedDates.includes(entryDate)) {
-      throw new Error(`${entryDate} は締め済みです。締め解除すると入力できます。`)
+    if (closedDates.includes(bookDate)) {
+      throw new Error(`${bookDate} は締め済みです。締め解除すると入力できます。`)
     }
     const seat = seats.find((s) => s.id === seatId)
     if (!seat) return
@@ -600,7 +603,7 @@ export const usePosStore = create<PosState>((set, get) => {
       ...(backThreshold > 0 ? { backThreshold } : {}),
       primaryCast,
       tableCasts,
-      completedAt: entryDateToTs(entryDate),
+      completedAt: entryDateToTs(bookDate),
       openedAt: seat.createdAt,
     }
 

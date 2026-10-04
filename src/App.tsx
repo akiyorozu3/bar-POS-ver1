@@ -90,10 +90,15 @@ export default function App() {
     if ((screen === 'menu' || screen === 'cast' || screen === 'punchmgr') && !isOwner) setScreen('order')
   }, [isOwner, canSales, screen])
 
-  // スタッフは日付変更不可＝常に今日に固定（万一ずれていたら戻す）
+  // スタッフは日付変更不可＝常に今日に固定。17時の日付切替をまたいでも最新化されるよう定期的に同期
+  // （アプリを開きっぱなしで entryDate が前営業日のまま固定される不具合の防止）
   useEffect(() => {
-    if (role === 'staff' && entryDate !== todayStr()) setEntryDate(todayStr())
-  }, [role, entryDate, setEntryDate])
+    if (role !== 'staff') return
+    const sync = () => { if (usePosStore.getState().entryDate !== todayStr()) setEntryDate(todayStr()) }
+    sync()
+    const id = setInterval(sync, 60000)
+    return () => clearInterval(id)
+  }, [role, setEntryDate])
 
   // 会計へ遷移イベント（OrderScreen から発火）
   useEffect(() => {
