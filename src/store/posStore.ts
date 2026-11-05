@@ -19,6 +19,7 @@ import {
   serverTimestamp,
   doc,
   getDoc,
+  getDocs,
   setDoc,
   writeBatch,
 } from 'firebase/firestore'
@@ -32,7 +33,7 @@ import { db, auth, COLLECTIONS } from '@/lib/firebase'
 import { idToEmail, emailToRole } from '@/lib/authConfig'
 import { calcBill, calcFee, DEFAULT_TAX_RATE } from '@/lib/tax'
 import { DEFAULT_MENUS } from '@/lib/defaultMenus'
-import type { Seat, OrderItem, MenuItem, Cast, Transaction, FeeSettings, PayMethod, Role, TaxMode, TaxSettings, Closure, Punch, Payout, Expense, RecurringExpense, ScheduledShift, ShiftWeek, CashEntry, CashSettings } from '@/types'
+import type { Seat, OrderItem, MenuItem, Cast, Transaction, FeeSettings, PayMethod, Role, TaxMode, TaxSettings, Closure, Punch, Payout, Expense, RecurringExpense, ScheduledShift, ShiftWeek, CashEntry, CashSettings, OiriTier, DailyReport } from '@/types'
 
 // 初期投入用のデフォルトキャスト（実データは Firestore で管理）
 export const DEFAULT_CASTS = ['さくら', 'あおい', 'ひなた', 'れいな']
@@ -65,6 +66,10 @@ interface PosState {
   transactions: Transaction[]
   transactionsLoading: boolean
 
+  // 日報（Firestoreからリアルタイム購読）
+  dailyReports: DailyReport[]
+  dailyReportsLoading: boolean
+
   // 手数料設定
   feeSettings: FeeSettings
 
@@ -76,6 +81,9 @@ interface PosState {
 
   // 卓バックが発生する最低会計額（税込合計がこの額以上のときだけ卓バック。0=条件なし）
   backThreshold: number
+
+  // 大入の設定（適用日付き。過去営業日へは遡及しない）。空＝まだ未設定＝大入なし
+  oiriTiers: OiriTier[]
 
   // （旧）カテゴリ別バック率。現行モデルでは未使用だが互換のため保持
   categoryRates: Record<string, number>
@@ -120,7 +128,7 @@ interface PosState {
 
   // アクション
   setEntryDate: (date: string) => void
-  addSeat: (name: string, solo: boolean) => void
+  addSeat: (name: string) => void
   removeSeat: (seatId: string) => void
   updateSeat: (id: string, patch: Partial<Seat>) => void
   setTableCasts: (seatId: string, casts: string[]) => void
@@ -189,11 +197,21 @@ interface PosState {
   deletePunch: (id: string) => Promise<void>
   subscribeTransactions: (from: Date, to: Date) => () => void
 
+  // 日報
+  subscribeDailyReports: () => () => void
+  addDailyReport: (data: Omit<DailyReport, 'id' | 'createdAt'>) => Promise<void>
+  deleteDailyReport: (id: string) => Promise<void>
+  // 指定営業日の売上（現金/カード/QR）を単発取得（日報の自動入力用）
+  fetchDaySales: (dateStr: string) => Promise<{ cash: number; card: number; qr: number }>
+
   saveFeeSettings: (settings: FeeSettings) => Promise<void>
   loadFeeSettings: () => Promise<void>
 
   saveBackRate: (rate: number, drinkRate: number, backThreshold: number) => Promise<void>
   loadBackRate: () => Promise<void>
+
+  saveOiriTiers: (tier1Amount: number, tier2Amount: number) => Promise<void>
+  loadOiriTiers: () => Promise<void>
 
   saveCategoryRates: (rates: Record<string, number>) => Promise<void>
   loadCategoryRates: () => Promise<void>
@@ -261,6 +279,7 @@ export const usePosStore = create<PosState>((set, get) => {
     setDoc(doc(db, COLLECTIONS.TABLES, seatId), {
       name: seat.name,
       solo: seat.solo,
+      headcount: seat.headcount,
       tableCasts: seat.tableCasts,
       items: orders[seatId] ?? [],
       createdAt: seat.createdAt,
@@ -284,10 +303,13 @@ export const usePosStore = create<PosState>((set, get) => {
   castsLoading: true,
   transactions: [],
   transactionsLoading: true,
+  dailyReports: [],
+  dailyReportsLoading: true,
   feeSettings: { card: 3.25, qr: 1.98 },
   backRate: BACK_RATE,
   drinkBackRate: 0,
   backThreshold: 0,
+  oiriTiers: [],
   categoryRates: {},
   taxRate: DEFAULT_TAX_RATE,
   taxMode: 'exclusive',
@@ -415,10 +437,10 @@ export const usePosStore = create<PosState>((set, get) => {
   },
 
   // ── 席 ──────────────────────────────────────
-  addSeat: (name, solo) => {
+  addSeat: (name) => {
     const id = newSeatId()
     set((s) => ({
-      seats: [...s.seats, { id, name, solo, tableCasts: [], createdAt: Date.now() }],
+      seats: [...s.seats, { id, name, solo: false, headcount: 1, tableCasts: [], createdAt: Date.now() }],
       orders: { ...s.orders, [id]: [] },
       currentSeatId: id,
     }))
@@ -590,7 +612,8 @@ export const usePosStore = create<PosState>((set, get) => {
 
     const tx: Omit<Transaction, 'id'> = {
       seatName: seat.name || `席 ${seat.id}`,
-      solo: seat.solo,
+      headcount: seat.headcount ?? 1,
+      solo: (seat.headcount ?? 1) === 1,   // 互換：1人なら一人客扱い
       items,
       subtotal,
       tax,
@@ -632,11 +655,13 @@ export const usePosStore = create<PosState>((set, get) => {
       const seats: Seat[] = []
       const orders: Record<string, OrderItem[]> = {}
       snap.docs.forEach((d) => {
-        const data = d.data() as { name?: string; solo?: boolean; tableCasts?: string[]; defaultCast?: string; items?: OrderItem[]; createdAt?: number }
+        const data = d.data() as { name?: string; solo?: boolean; headcount?: number; tableCasts?: string[]; defaultCast?: string; items?: OrderItem[]; createdAt?: number }
         seats.push({
           id: d.id,
           name: data.name ?? '',
           solo: !!data.solo,
+          // 旧データは人数未設定→1人既定
+          headcount: data.headcount ?? 1,
           // 旧データ（defaultCast）からの移行に対応
           tableCasts: data.tableCasts ?? (data.defaultCast ? [data.defaultCast] : []),
           createdAt: data.createdAt ?? 0,
@@ -710,6 +735,50 @@ export const usePosStore = create<PosState>((set, get) => {
 
   deletePayout: async (id) => {
     await deleteDoc(doc(db, COLLECTIONS.PAYOUTS, id))
+  },
+
+  // ── 日報 ─────────────────────────────────────────
+  subscribeDailyReports: () => {
+    const q = query(collection(db, COLLECTIONS.DAILY_REPORTS), orderBy('date', 'desc'))
+    const unsub = onSnapshot(q, (snap) => {
+      set({ dailyReports: snap.docs.map((d) => ({ id: d.id, ...d.data() } as DailyReport)), dailyReportsLoading: false })
+    }, () => { set({ dailyReportsLoading: false }) })
+    return unsub
+  },
+
+  addDailyReport: async (data) => {
+    await addDoc(collection(db, COLLECTIONS.DAILY_REPORTS), {
+      ...data,
+      createdAt: Date.now(),
+      _createdAt: serverTimestamp(),
+    })
+  },
+
+  deleteDailyReport: async (id) => {
+    await deleteDoc(doc(db, COLLECTIONS.DAILY_REPORTS, id))
+  },
+
+  // 指定営業日の売上を単発取得して現金/カード/QR に集計（分割支払いは内訳で振り分け）
+  fetchDaySales: async (dateStr) => {
+    const fromMs = businessDayStart(dateStr).getTime()
+    const toMs = businessDayEnd(dateStr).getTime() - 1
+    const totals = { cash: 0, card: 0, qr: 0 }
+    try {
+      const snap = await getDocs(query(
+        collection(db, COLLECTIONS.TRANSACTIONS),
+        where('completedAt', '>=', fromMs),
+        where('completedAt', '<=', toMs),
+      ))
+      snap.docs.forEach((d) => {
+        const t = d.data() as Transaction
+        if (t.payments && t.payments.length) {
+          for (const p of t.payments) totals[p.method] += p.amount
+        } else {
+          totals[t.payMethod] += t.total
+        }
+      })
+    } catch { /* 読み取り不可時は0のまま */ }
+    return totals
   },
 
   // ── 経費（単発） ──────────────────────────────
@@ -918,7 +987,7 @@ export const usePosStore = create<PosState>((set, get) => {
     const id = newSeatId()
     const items = tx.items.map((it) => ({ ...it, id: newItemId() }))
     set((s) => ({
-      seats: [...s.seats, { id, name: tx.seatName ?? '', solo: !!tx.solo, tableCasts: tx.tableCasts ?? [], createdAt: tx.openedAt ?? Date.now() }],
+      seats: [...s.seats, { id, name: tx.seatName ?? '', solo: !!tx.solo, headcount: tx.headcount ?? 1, tableCasts: tx.tableCasts ?? [], createdAt: tx.openedAt ?? Date.now() }],
       orders: { ...s.orders, [id]: items },
       currentSeatId: id,
       entryDate: dateStrOf(tx.completedAt),
@@ -956,6 +1025,32 @@ export const usePosStore = create<PosState>((set, get) => {
         drinkBackRate: d.drinkRate ?? 0,
         backThreshold: d.backThreshold ?? 0,
       })
+    }
+  },
+
+  // ── 大入の永続化（適用日付き。変更は当日以降のみ・過去へは遡及しない） ──
+  // 金額(2万/3万)のみ編集可。閾値(15万/25万)は固定で一緒に保存しておく。
+  // 保存時は「今日の営業日」を from とする新エントリを追加（同じ from は置換）。
+  saveOiriTiers: async (tier1Amount, tier2Amount) => {
+    const from = todayStr()
+    const prev = get().oiriTiers
+    const entry: OiriTier = {
+      from,
+      tier1Threshold: 150000, tier1Amount: Math.max(0, Math.round(tier1Amount)),
+      tier2Threshold: 250000, tier2Amount: Math.max(0, Math.round(tier2Amount)),
+    }
+    const tiers = [...prev.filter((t) => t.from !== from), entry].sort((a, b) => a.from.localeCompare(b.from))
+    set({ oiriTiers: tiers })
+    await setDoc(doc(db, COLLECTIONS.SETTINGS, 'oiri'), { tiers })
+  },
+
+  loadOiriTiers: async () => {
+    const snap = await getDoc(doc(db, COLLECTIONS.SETTINGS, 'oiri'))
+    if (snap.exists()) {
+      const d = snap.data() as { tiers?: OiriTier[] }
+      if (Array.isArray(d.tiers)) {
+        set({ oiriTiers: [...d.tiers].sort((a, b) => a.from.localeCompare(b.from)) })
+      }
     }
   },
 

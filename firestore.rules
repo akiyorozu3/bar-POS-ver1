@@ -19,9 +19,20 @@ service cloud.firestore {
       return isAuthed() && request.auth.token.email == 'manager@bar-pos.local';
     }
 
-    // 売上管理を見られる権限（オーナー or マネージャー）
+    // 税務か（閲覧のみ：売上管理・金庫・純利益を見られるが入力は一切不可）
+    // ※ VITE_ZEIMU_ID を変えた場合はここも合わせること
+    function isZeimu() {
+      return isAuthed() && request.auth.token.email == 'zeimu@bar-pos.local';
+    }
+
+    // 売上管理を見られる権限（オーナー or マネージャー）＝追加/編集/削除まで可能
     function canSales() {
       return isOwner() || isManager();
+    }
+
+    // 売上・金庫・純利益を「閲覧」できる権限（オーナー・マネージャー・税務）
+    function canViewFinance() {
+      return canSales() || isZeimu();
     }
 
     // メニュー：ログイン済みは閲覧可 / 追加・編集・削除はオーナーのみ
@@ -53,17 +64,20 @@ service cloud.firestore {
       allow update, delete: if isOwner();
     }
 
-    // 日払い/大入：オーナー・マネージャー（追加/削除まで可）
+    // 日払い/大入：閲覧はオーナー・マネージャー・税務／追加・削除はオーナー・マネージャー
     match /payouts/{id} {
-      allow read, write: if canSales();
+      allow read: if canViewFinance();
+      allow write: if canSales();
     }
 
-    // 経費・固定費：オーナー・マネージャー（追加/削除まで可）
+    // 経費・固定費：閲覧はオーナー・マネージャー・税務／追加・削除はオーナー・マネージャー
     match /expenses/{id} {
-      allow read, write: if canSales();
+      allow read: if canViewFinance();
+      allow write: if canSales();
     }
     match /recurringExpenses/{id} {
-      allow read, write: if canSales();
+      allow read: if canViewFinance();
+      allow write: if canSales();
     }
 
     // 予定シフト・シフト週：オーナー・マネージャーのみ（閲覧・編集）
@@ -77,12 +91,14 @@ service cloud.firestore {
     match /shiftSettings/{id} {
       allow read, write: if canSales();
     }
-    // 金庫（お金の残高台帳）：owner/manager が閲覧・入出金・期首残高を管理
+    // 金庫（お金の残高台帳）：閲覧はオーナー・マネージャー・税務（残高/履歴照会）／入出金・期首残高はオーナー・マネージャー
     match /cashEntries/{id} {
-      allow read, write: if canSales();
+      allow read: if canViewFinance();
+      allow write: if canSales();
     }
     match /cashSettings/{id} {
-      allow read, write: if canSales();
+      allow read: if canViewFinance();
+      allow write: if canSales();
     }
 
     // 手数料設定：ログイン済みは閲覧可（会計計算に必要） / 変更はオーナーのみ
@@ -91,12 +107,20 @@ service cloud.firestore {
       allow write: if isOwner();
     }
 
-    // 取引（売上）：スタッフは「会計の確定（作成）」のみ可能。
-    // 閲覧はオーナー・マネージャー。修正・削除はオーナーのみ（マネージャーは閲覧専用）。
+    // 取引（売上）：スタッフは「会計の確定（作成）」のみ。
+    // 閲覧はログイン済み全員（日報の売上自動入力のため。※UIのスタッフは売上管理画面には入れない）。
+    // 修正・削除はオーナーのみ。
     match /transactions/{id} {
       allow create: if isAuthed();
-      allow read: if canSales();
+      allow read: if isAuthed();
       allow update, delete: if isOwner();
+    }
+
+    // 日報：閲覧はログイン済み全員。作成は税務以外（owner/manager/staff）。削除はオーナー・マネージャー。
+    match /dailyReports/{id} {
+      allow read: if isAuthed();
+      allow create: if isAuthed() && !isZeimu();
+      allow update, delete: if canSales();
     }
   }
 }

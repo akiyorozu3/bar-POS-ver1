@@ -1,10 +1,11 @@
 // 純利益（P&L）の日別・月別集計。
-// 純利益 = 実入金 − 人件費 − バック − 大入 ＋ 経費(符号込み)   ※日払いは引かない（表示のみ）
-import type { Transaction, Payout, Expense, RecurringExpense, Cast, MenuItem } from '@/types'
+// 純利益 = 実入金 − 人件費 − バック − 大入 − 固定費(日割り)   ※単発経費・日払いは引かない（表示のみ）
+import type { Transaction, Payout, Expense, RecurringExpense, Cast, MenuItem, OiriTier } from '@/types'
 import type { Shift } from '@/lib/punch'
 import { durationMin } from '@/lib/punch'
 import { wageOn, castLabel } from '@/lib/cast'
 import { dateStrOf } from '@/store/posStore'
+import { oiriConfigOn, oiriForDay } from '@/lib/oiri'
 import { DRINK_BACK_CATEGORY, DRINK_BACK_CATEGORIES } from '@/lib/defaultMenus'
 
 const DRINK = DRINK_BACK_CATEGORY
@@ -16,8 +17,28 @@ export interface ProfitRow {
   back: number       // バック（卓＋ドリンク）
   oiri: number       // 大入
   dailyPay: number   // 日払い（純利益には引かない・表示用）
-  expense: number    // 経費（符号込み。−が支出）
+  expense: number    // 単発経費（符号込み。−が支出。純利益には含めない＝金庫で管理）
+  fixedDay: number   // 固定費の日割り（符号込み。−が支出。純利益から差し引く）
   profit: number     // 純利益
+}
+
+// 指定年月(1-12)の暦日数
+const daysInMonth = (y: number, m: number) => new Date(y, m, 0).getDate()
+// 指定年月に weekday(0-6) が何回あるか
+function countWeekday(y: number, m: number, weekday: number): number {
+  const D = daysInMonth(y, m)
+  let c = 0
+  for (let d = 1; d <= D; d++) if (new Date(y, m - 1, d).getDay() === weekday) c++
+  return c
+}
+// 指定年月の固定費「月額合計」（符号込み）。毎週分はその月の該当回数で月換算。
+function monthlyFixedTotal(recurring: RecurringExpense[], y: number, m: number): number {
+  let total = 0
+  for (const r of recurring) {
+    if (r.cycle === 'monthly') total += r.amount
+    else total += r.amount * countWeekday(y, m, r.day)   // 毎週 → その月の回数で月換算
+  }
+  return total
 }
 
 interface Params {
@@ -30,11 +51,12 @@ interface Params {
   menus: MenuItem[]
   backRate: number
   drinkBackRate: number
+  oiriTiers: OiriTier[]   // 大入の設定（適用日付き）
   fromStr: string    // 期間開始（YYYY-MM-DD）
   toStr: string      // 期間終了（YYYY-MM-DD）
 }
 
-const emptyAgg = () => ({ sales: 0, labor: 0, back: 0, oiri: 0, dailyPay: 0, expense: 0 })
+const emptyAgg = () => ({ sales: 0, labor: 0, back: 0, oiri: 0, dailyPay: 0, expense: 0, fixedDay: 0 })
 type Agg = ReturnType<typeof emptyAgg>
 
 // 1取引のバック額（卓バック＋ドリンクバック）。useSalesSummary と完全に同じ考え方。
@@ -67,17 +89,25 @@ export function computeProfit(p: Params): { days: ProfitRow[]; months: ProfitRow
   const byDay = new Map<string, Agg>()
   const day = (k: string) => { let a = byDay.get(k); if (!a) { a = emptyAgg(); byDay.set(k, a) } return a }
 
-  // 実入金・バック（取引の営業日で集計）
+  // 実入金・バック（取引の営業日で集計）。大入計算のため営業日ごとの取引も控えておく。
+  const txByDay = new Map<string, Transaction[]>()
   for (const t of p.transactions) {
     const k = dateStrOf(t.completedAt)
     const a = day(k)
     a.sales += t.netAmount
     a.back += txBack(t, p.backRate, p.drinkBackRate, menuBack, noBackNames)
+    const arr = txByDay.get(k) ?? []; arr.push(t); txByDay.set(k, arr)
   }
-  // 大入・日払い
+  // 大入：営業日ごとに自動計算（その日に有効な設定を使う）。設定が無い過去日のみ、
+  // 旧仕様の手動大入(payout)で補う＝過去へ遡及しない。
+  for (const [k, txs] of txByDay) {
+    const cfg = oiriConfigOn(p.oiriTiers, k)
+    if (cfg) day(k).oiri += oiriForDay(txs, cfg).total
+  }
+  // 日払い（手動）。大入(payout)は設定の無い過去日だけ採用（上の自動計算と二重計上しない）。
   for (const po of p.payouts) {
     const a = day(po.date)
-    if (po.type === 'oiri') a.oiri += po.amount
+    if (po.type === 'oiri') { if (!oiriConfigOn(p.oiriTiers, po.date)) a.oiri += po.amount }
     else a.dailyPay += po.amount
   }
   // 経費（単発）
@@ -89,14 +119,17 @@ export function computeProfit(p: Params): { days: ProfitRow[]; months: ProfitRow
     const c = castById.get(s.castId)
     day(s.date).labor += (c ? wageOn(c, s.date) : 0) * (min / 60)   // シフト日付の時給（変更履歴対応）
   }
-  // 固定費（期間内の該当日に計上）
+  // 固定費（日割り）：各暦日に「その月の固定費月額合計 ÷ その月の日数」を計上し、純利益から差し引く。
+  // 期間内の全暦日に載せる（売上の無い日も固定費は発生するため、月合計が正しくなる）。
   const end = new Date(`${p.toStr}T12:00:00`)
+  const monthlyCache = new Map<string, { perDay: number }>()
   for (const d = new Date(`${p.fromStr}T12:00:00`); d <= end; d.setDate(d.getDate() + 1)) {
-    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    for (const r of p.recurringExpenses) {
-      const hit = r.cycle === 'monthly' ? d.getDate() === r.day : d.getDay() === r.day
-      if (hit) day(k).expense += r.amount
-    }
+    const y = d.getFullYear(), mo = d.getMonth() + 1
+    const k = `${y}-${String(mo).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const mk = `${y}-${String(mo).padStart(2, '0')}`
+    let c = monthlyCache.get(mk)
+    if (!c) { c = { perDay: monthlyFixedTotal(p.recurringExpenses, y, mo) / daysInMonth(y, mo) }; monthlyCache.set(mk, c) }
+    day(k).fixedDay += c.perDay
   }
 
   const toRow = (key: string, a: Agg): ProfitRow => ({
@@ -107,8 +140,9 @@ export function computeProfit(p: Params): { days: ProfitRow[]; months: ProfitRow
     oiri: Math.round(a.oiri),
     dailyPay: Math.round(a.dailyPay),
     expense: Math.round(a.expense),
-    // 純利益は経費を含めない（＝営業の儲け。経費・家賃等は金庫で現金として管理）
-    profit: Math.round(a.sales - a.labor - a.back - a.oiri),
+    fixedDay: Math.round(a.fixedDay),
+    // 純利益＝実入金−人件費−バック−大入−固定費(日割り)。単発経費は含めない（金庫で現金管理）
+    profit: Math.round(a.sales - a.labor - a.back - a.oiri + a.fixedDay),
   })
 
   // 日別（何かしら値のある日だけ、新しい順）。経費だけの日は純利益に出さない（金庫で見る）
@@ -122,13 +156,13 @@ export function computeProfit(p: Params): { days: ProfitRow[]; months: ProfitRow
   for (const [k, a] of byDay) {
     const mk = k.slice(0, 7)
     let m = byMonth.get(mk); if (!m) { m = emptyAgg(); byMonth.set(mk, m) }
-    m.sales += a.sales; m.labor += a.labor; m.back += a.back; m.oiri += a.oiri; m.dailyPay += a.dailyPay; m.expense += a.expense
+    m.sales += a.sales; m.labor += a.labor; m.back += a.back; m.oiri += a.oiri; m.dailyPay += a.dailyPay; m.expense += a.expense; m.fixedDay += a.fixedDay
   }
   const months = [...byMonth.entries()].map(([k, a]) => toRow(k, a)).sort((x, y) => y.key.localeCompare(x.key))
 
   // 期間合計
   const totalAgg = emptyAgg()
-  for (const a of byDay.values()) { totalAgg.sales += a.sales; totalAgg.labor += a.labor; totalAgg.back += a.back; totalAgg.oiri += a.oiri; totalAgg.dailyPay += a.dailyPay; totalAgg.expense += a.expense }
+  for (const a of byDay.values()) { totalAgg.sales += a.sales; totalAgg.labor += a.labor; totalAgg.back += a.back; totalAgg.oiri += a.oiri; totalAgg.dailyPay += a.dailyPay; totalAgg.expense += a.expense; totalAgg.fixedDay += a.fixedDay }
 
   return { days, months, total: toRow('合計', totalAgg) }
 }

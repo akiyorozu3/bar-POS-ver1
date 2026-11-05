@@ -3,6 +3,7 @@ import { usePosStore, todayStr, dateStrOf, businessDayStart, businessDayEnd } fr
 import type { Transaction } from '@/types'
 import { useSalesSummary } from '@/hooks/useSalesSummary'
 import { buildTransactionCSV, buildCastCSV, downloadCSV } from '@/lib/csv'
+import { oiriConfigOn, oiriForDay, DEFAULT_OIRI_TIER } from '@/lib/oiri'
 import { castLabel, wageOn } from '@/lib/cast'
 import { BACK_DRINK_CATEGORY } from '@/lib/defaultMenus'
 import { buildShifts, durationMin } from '@/lib/punch'
@@ -50,8 +51,9 @@ function periodRange(period: Period, entryDate: string): [Date, Date] {
 }
 
 export default function SalesScreen() {
-  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, backThreshold, saveBackRate, taxRate, taxMode, saveTaxSettings, seats, orders, closedDates, closeDay, reopenDay, entryDate, casts, payouts, subscribePayouts, addPayout, deletePayout, deleteTransaction, restoreTransaction, role, expenses, recurringExpenses, subscribeExpenses, subscribeRecurringExpenses, menus, punches, subscribePunches } = usePosStore()
+  const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, backThreshold, saveBackRate, oiriTiers, saveOiriTiers, taxRate, taxMode, saveTaxSettings, seats, orders, closedDates, closeDay, reopenDay, entryDate, casts, payouts, subscribePayouts, addPayout, deletePayout, deleteTransaction, restoreTransaction, role, expenses, recurringExpenses, subscribeExpenses, subscribeRecurringExpenses, menus, punches, subscribePunches } = usePosStore()
   const isOwner = role === 'owner'
+  const isReadOnly = role === 'zeimu'   // 税務：閲覧のみ（入力・削除不可）
   const [period, setPeriod] = useState<Period>('today')
   const [customFrom, setCustomFrom] = useState(todayStr())
   const [customTo, setCustomTo] = useState(todayStr())
@@ -63,7 +65,6 @@ export default function SalesScreen() {
   const [showPayoutPanel, setShowPayoutPanel] = useState(false)
   const [payoutCast, setPayoutCast] = useState('')
   const [payoutAmount, setPayoutAmount] = useState('')
-  const [payoutType, setPayoutType] = useState<'daily' | 'oiri'>('daily')
   // 純利益
   const [showProfitPanel, setShowProfitPanel] = useState(false)
   const [profitMode, setProfitMode] = useState<'day' | 'month'>('day')
@@ -74,6 +75,10 @@ export default function SalesScreen() {
   const [backPct, setBackPct] = useState(String(Math.round(backRate * 100)))
   const [drinkPct, setDrinkPct] = useState(String(Math.round(drinkBackRate * 100)))
   const [backMin, setBackMin] = useState(String(backThreshold))
+  // 大入の原資（今日時点で有効な設定の金額を初期値に）。閾値15万/25万は固定・金額のみ編集可。
+  const oiriNow = oiriConfigOn(oiriTiers, todayStr()) ?? DEFAULT_OIRI_TIER
+  const [oiri1, setOiri1] = useState(String(oiriNow.tier1Amount))
+  const [oiri2, setOiri2] = useState(String(oiriNow.tier2Amount))
   const [taxPct, setTaxPct] = useState(String(Math.round(taxRate * 100)))
   const [taxModeLocal, setTaxModeLocal] = useState(taxMode)
   const [feeSaved, setFeeSaved] = useState(false)
@@ -160,7 +165,7 @@ export default function SalesScreen() {
   const castRows = [...allCastNames]
     .map((name) => {
       const cs = backByName.get(name)
-      return { name, txCount: cs?.txCount ?? 0, salesAmount: cs?.salesAmount ?? 0, backAmount: cs?.backAmount ?? 0 }
+      return { name, txCount: cs?.txCount ?? 0, salesAmount: cs?.salesAmount ?? 0, backAmount: cs?.backAmount ?? 0, oiriAmount: cs?.oiriAmount ?? 0 }
     })
     .sort((a, b) => b.salesAmount - a.salesAmount || b.backAmount - a.backAmount || a.name.localeCompare(b.name))
   // 合計（本給＝通算時給＋バック、源泉徴収は源泉ありキャスト分の合計、渡す残額＝本給＋大入−日払い−源泉徴収）
@@ -168,9 +173,11 @@ export default function SalesScreen() {
   const totalWithhold = castRows.reduce((a, c) => a + withholdOf(c.name, (laborByName.get(c.name)?.labor ?? 0) + c.backAmount), 0)
   const totalPayout = totalHonkyu - totalDaily - totalWithhold
 
-  // 日払い/大入（選択期間の分。payouts は購読範囲＝選択期間そのもの）
+  // 日払い（選択期間の分・手動）。payouts は購読範囲＝選択期間そのもの。
   const periodDailyPay = payouts.filter((p) => p.type === 'daily').reduce((a, p) => a + p.amount, 0)
-  const periodOiri = payouts.filter((p) => p.type === 'oiri').reduce((a, p) => a + p.amount, 0)
+  // 大入は自動計算（summary.totalOiri）。設定の無い過去日だけ旧仕様の手動大入(payout)で補う（遡及しない）。
+  const legacyOiriPeriod = payouts.filter((p) => p.type === 'oiri' && !oiriConfigOn(oiriTiers, p.date)).reduce((a, p) => a + p.amount, 0)
+  const periodOiri = summary.totalOiri + legacyOiriPeriod
   const periodPayoutTotal = periodDailyPay + periodOiri
   const periodLabel = period === 'custom'
     ? `${customFrom.slice(5).replace('-', '/')}〜${customTo.slice(5).replace('-', '/')}`
@@ -179,7 +186,11 @@ export default function SalesScreen() {
   // 日払い/大入（ヘッダー日付の分。レジ締めは1営業日単位のため日別で使う）
   const dayPayouts = payouts.filter((p) => p.date === closeDate)
   const dailyPayTotal = dayPayouts.filter((p) => p.type === 'daily').reduce((a, p) => a + p.amount, 0)
-  const oiriTotal = dayPayouts.filter((p) => p.type === 'oiri').reduce((a, p) => a + p.amount, 0)
+  // 大入はその営業日を自動計算。設定の無い過去日だけ旧仕様の手動大入で補う。
+  const closeCfg = oiriConfigOn(oiriTiers, closeDate)
+  const oiriTotal = closeCfg
+    ? oiriForDay(transactions.filter((t) => dateStrOf(t.completedAt) === closeDate), closeCfg).total
+    : dayPayouts.filter((p) => p.type === 'oiri').reduce((a, p) => a + p.amount, 0)
 
   // 金庫現金：全て現金前提。ヘッダー日の単発経費＋その日に該当する固定費を反映。
   const dayOneoff = expenses.filter((e) => e.date === closeDate).reduce((a, e) => a + e.amount, 0)
@@ -199,7 +210,7 @@ export default function SalesScreen() {
   const profit = computeProfit({
     transactions: pd.transactions, payouts: pd.payouts, expenses: pd.expenses,
     recurringExpenses: pd.recurringExpenses, shifts: buildShifts(pd.punches).shifts,
-    casts, menus, backRate, drinkBackRate, fromStr: pd.fromStr, toStr: pd.toStr,
+    casts, menus, backRate, drinkBackRate, oiriTiers, fromStr: pd.fromStr, toStr: pd.toStr,
   })
   // 日別は対象月だけに絞って表示（7月・8月が混在しないように）
   const profitRows = profitMode === 'day' ? profit.days.filter((r) => r.key.slice(0, 7) === profitDayMonth) : profit.months
@@ -216,7 +227,7 @@ export default function SalesScreen() {
   const handleAddPayout = async () => {
     const amt = Math.abs(parseInt(payoutAmount, 10))
     if (!payoutCast || !Number.isFinite(amt) || amt === 0) return
-    await addPayout(payoutCast, payoutType, amt)
+    await addPayout(payoutCast, 'daily', amt)
     setPayoutAmount('')
   }
 
@@ -267,6 +278,10 @@ export default function SalesScreen() {
   useEffect(() => { setBackPct(String(Math.round(backRate * 100))) }, [backRate])
   useEffect(() => { setDrinkPct(String(Math.round(drinkBackRate * 100))) }, [drinkBackRate])
   useEffect(() => { setBackMin(String(backThreshold)) }, [backThreshold])
+  useEffect(() => {
+    const cfg = oiriConfigOn(oiriTiers, todayStr()) ?? DEFAULT_OIRI_TIER
+    setOiri1(String(cfg.tier1Amount)); setOiri2(String(cfg.tier2Amount))
+  }, [oiriTiers])
   useEffect(() => { setCardFee(String(feeSettings.card)); setQrFee(String(feeSettings.qr)) }, [feeSettings])
   useEffect(() => { setTaxPct(String(Math.round(taxRate * 100))) }, [taxRate])
   useEffect(() => { setTaxModeLocal(taxMode) }, [taxMode])
@@ -276,11 +291,17 @@ export default function SalesScreen() {
     const dPct = Math.min(100, Math.max(0, parseFloat(drinkPct) || 0))
     const tPct = Math.min(100, Math.max(0, parseFloat(taxPct) || 0))
     const minAmt = Math.max(0, parseInt(backMin, 10) || 0)
-    await Promise.all([
+    const o1 = Math.max(0, parseInt(oiri1, 10) || 0)
+    const o2 = Math.max(0, parseInt(oiri2, 10) || 0)
+    const cur = oiriConfigOn(oiriTiers, todayStr()) ?? DEFAULT_OIRI_TIER
+    const ops: Promise<void>[] = [
       saveFeeSettings({ card: parseFloat(cardFee) || 0, qr: parseFloat(qrFee) || 0 }),
       saveBackRate(pct / 100, dPct / 100, minAmt),
       saveTaxSettings({ rate: tPct / 100, mode: taxModeLocal }),
-    ])
+    ]
+    // 大入の金額が変わったときだけ、当日以降の設定として追加（過去へは遡及しない）
+    if (o1 !== cur.tier1Amount || o2 !== cur.tier2Amount) ops.push(saveOiriTiers(o1, o2))
+    await Promise.all(ops)
     setFeeSaved(true)
     setTimeout(() => setFeeSaved(false), 2000)
   }
@@ -378,6 +399,7 @@ export default function SalesScreen() {
                 <div className={`tx-row ${txClosed(t) ? 'closed' : ''}`} key={t.id}>
                   <span className="tx-time">{new Date(t.completedAt).toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                   <span className="tx-seat">{t.seatName}</span>
+                  <span className="tx-headcount">{(t.headcount ?? (t.solo ? 1 : null)) != null ? `${t.headcount ?? 1}人` : ''}</span>
                   <span className={`method ${txPayCls(t)}`}>{txPayLabel(t)}</span>
                   <span className="tx-total">¥{t.total.toLocaleString()}</span>
                   <span className="tx-actions">
@@ -398,19 +420,20 @@ export default function SalesScreen() {
             <div className="fee-settings-title">
               <i className="ti ti-cash-banknote" aria-hidden /> 日払い/大入（{periodLabel}）
             </div>
-            <div className="mm-add-row" style={{ marginBottom: 8 }}>
-              <select className="mm-add-cat" value={payoutType} onChange={(e) => setPayoutType(e.target.value as 'daily' | 'oiri')}>
-                <option value="daily">日払い</option>
-                <option value="oiri">大入</option>
-              </select>
-              <select className="mm-add-name" value={payoutCast} onChange={(e) => setPayoutCast(e.target.value)}>
-                <option value="">キャスト</option>
-                {casts.map((c) => <option key={c.id} value={c.id}>{castLabel(c)}</option>)}
-              </select>
-              <input className="mm-add-price" type="number" min="0" placeholder="金額" value={payoutAmount} onChange={(e) => setPayoutAmount(e.target.value)} />
-              <button className="mm-add-btn" onClick={handleAddPayout} disabled={!payoutCast || !payoutAmount}>＋ 追加</button>
-            </div>
-            <div className="mm-note" style={{ padding: '0 2px 6px' }}>＋追加は {closeDate.replace(/-/g, '/')} に記録されます</div>
+            {!isReadOnly && (
+              <>
+                <div className="mm-add-row" style={{ marginBottom: 8 }}>
+                  <span className="mm-add-cat" style={{ display: 'inline-flex', alignItems: 'center', padding: '0 8px' }}>日払い</span>
+                  <select className="mm-add-name" value={payoutCast} onChange={(e) => setPayoutCast(e.target.value)}>
+                    <option value="">キャスト</option>
+                    {casts.map((c) => <option key={c.id} value={c.id}>{castLabel(c)}</option>)}
+                  </select>
+                  <input className="mm-add-price" type="number" min="0" placeholder="金額" value={payoutAmount} onChange={(e) => setPayoutAmount(e.target.value)} />
+                  <button className="mm-add-btn" onClick={handleAddPayout} disabled={!payoutCast || !payoutAmount}>＋ 追加</button>
+                </div>
+                <div className="mm-note" style={{ padding: '0 2px 6px' }}>＋追加は {closeDate.replace(/-/g, '/')} に日払いとして記録されます。大入は売上から自動計算されるため手入力は不要です（「手数料/バック」で金額を設定）。</div>
+              </>
+            )}
             {payouts.length === 0 ? (
               <div className="mm-empty" style={{ padding: 12 }}>{periodLabel}の日払い/大入はありません</div>
             ) : payouts.map((p) => (
@@ -422,7 +445,7 @@ export default function SalesScreen() {
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   ¥{p.amount.toLocaleString()}
-                  <button className="mm-row-del" onClick={() => deletePayout(p.id)}>削除</button>
+                  {!isReadOnly && <button className="mm-row-del" onClick={() => deletePayout(p.id)}>削除</button>}
                 </span>
               </div>
             ))}
@@ -458,7 +481,7 @@ export default function SalesScreen() {
               <div className={`profit-summary-val ${(shownMonthProfit?.profit ?? 0) < 0 ? 'minus' : ''}`}>¥{(shownMonthProfit?.profit ?? 0).toLocaleString()}</div>
               <div className="profit-summary-sub">
                 {shownMonthProfit
-                  ? `実入金 ¥${shownMonthProfit.sales.toLocaleString()} − 人件費 ¥${shownMonthProfit.labor.toLocaleString()} − バック ¥${shownMonthProfit.back.toLocaleString()} − 大入 ¥${shownMonthProfit.oiri.toLocaleString()}（経費は含まず／金庫で管理）`
+                  ? `実入金 ¥${shownMonthProfit.sales.toLocaleString()} − 人件費 ¥${shownMonthProfit.labor.toLocaleString()} − バック ¥${shownMonthProfit.back.toLocaleString()} − 大入 ¥${shownMonthProfit.oiri.toLocaleString()} − 固定費 ¥${Math.abs(shownMonthProfit.fixedDay).toLocaleString()}（単発経費は含まず／金庫で管理）`
                   : `${shownMonthLabel}のデータはまだありません`}
               </div>
             </div>
@@ -466,7 +489,7 @@ export default function SalesScreen() {
             <div className="profit-table-wrap">
               <div className="profit-table">
                 <div className={`profit-head ${profitMode === 'day' ? 'day' : ''}`}>
-                  <span>{profitMode === 'day' ? '日付' : '月'}</span><span>売上</span><span>人件費</span><span>バック</span><span>大入</span><span>日払い</span>{profitMode === 'day' && <span>経費</span>}<span>純利益</span>
+                  <span>{profitMode === 'day' ? '日付' : '月'}</span><span>売上</span><span>人件費</span><span>バック</span><span>大入</span><span>日払い</span>{profitMode === 'day' && <span>経費</span>}<span>固定費</span><span>純利益</span>
                 </div>
                 {pd.loading ? (
                   <div className="mm-empty" style={{ padding: 12 }}>読み込み中...</div>
@@ -481,23 +504,24 @@ export default function SalesScreen() {
                     <span className="minus">{r.oiri ? `−¥${r.oiri.toLocaleString()}` : '—'}</span>
                     <span className="muted">{r.dailyPay ? `(¥${r.dailyPay.toLocaleString()})` : '—'}</span>
                     {profitMode === 'day' && <span className="muted">—</span>}
+                    <span className="minus">{r.fixedDay ? `−¥${Math.abs(r.fixedDay).toLocaleString()}` : '—'}</span>
                     <span className={`profit-val ${r.profit < 0 ? 'minus' : ''}`}>¥{r.profit.toLocaleString()}</span>
                   </div>
                 ))}
                 {profitMode === 'day' && profitRows.length > 0 && (
                   <div className="profit-row day profit-expense-row">
-                    <span className="profit-key">経費（当月）</span>
+                    <span className="profit-key">単発経費（当月）</span>
                     <span /><span /><span /><span /><span />
                     <span className={(shownMonthProfit?.expense ?? 0) < 0 ? 'minus' : ''}>
                       {(() => { const me = shownMonthProfit?.expense ?? 0; return me ? `${me < 0 ? '−' : '＋'}¥${Math.abs(me).toLocaleString()}` : '¥0' })()}
                     </span>
-                    <span />
+                    <span /><span />
                   </div>
                 )}
               </div>
             </div>
             <div className="mm-note" style={{ paddingTop: 6 }}>
-              純利益＝実入金−人件費−バック−大入（経費は含めません＝営業の儲け。経費は「金庫」で現金として管理）。日別は経費を各日に載せず、当月合計を最下行に表示。日払いは前払い分なので差し引かず参考表示（括弧）。
+              純利益＝実入金−人件費−バック−大入−固定費（日割り）。固定費は「金庫」の固定費入力を月額合計し、その月の日数で割って各日に計上（毎週分はその月の回数で月換算）。単発経費は純利益に含めず「金庫」で現金管理（日別は当月合計を最下行に表示）。日払いは前払い分なので差し引かず参考表示（括弧）。
             </div>
           </div>
         )}
@@ -611,8 +635,25 @@ export default function SalesScreen() {
                 <span className="fee-pct">%</span>
               </div>
             </div>
+            <div className="cat-rate-title">大入（おおいり）の原資</div>
+            <div className="fee-row">
+              <span className="fee-row-lbl"><i className="ti ti-confetti" aria-hidden /> 1日の売上 15万円以上で</span>
+              <div className="fee-input-wrap">
+                <span className="fee-pct">¥</span>
+                <input className="fee-input" type="number" min="0" step="1000"
+                  value={oiri1} onChange={(e) => setOiri1(e.target.value)} />
+              </div>
+            </div>
+            <div className="fee-row">
+              <span className="fee-row-lbl"><i className="ti ti-confetti" aria-hidden /> 1日の売上 25万円以上で</span>
+              <div className="fee-input-wrap">
+                <span className="fee-pct">¥</span>
+                <input className="fee-input" type="number" min="0" step="1000"
+                  value={oiri2} onChange={(e) => setOiri2(e.target.value)} />
+              </div>
+            </div>
             <div className="cat-rate-title" style={{ borderTop: 'none', paddingTop: 0 }}>
-              卓バック＝合計×卓バック率を卓の担当で頭割り（会計の税込合計が最低会計額以上のときだけ発生。最低会計額は会計時に取引へ記録するため、設定変更は今後の会計にのみ適用され過去には遡及しません。0＝条件なし）／キャストドリンクは料金×ドリンクバック率をその担当へ上乗せ
+              卓バック＝合計×卓バック率を卓の担当で頭割り（会計の税込合計が最低会計額以上のときだけ発生。最低会計額は会計時に取引へ記録するため、設定変更は今後の会計にのみ適用され過去には遡及しません。0＝条件なし）／キャストドリンクは料金×ドリンクバック率をその担当へ上乗せ／大入＝1日の売上合計が閾値以上のとき上記の原資を、その日の各キャストの売上シェアで按分（金額変更は当日以降のみ・過去へは遡及しません）
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
@@ -717,7 +758,7 @@ export default function SalesScreen() {
           <div className="section-title">キャストバック集計</div>
           <div className="cast-table">
             <div className={`cast-head ${isOwner ? '' : 'mgr'}`}>
-              <span>キャスト</span><span>卓数</span><span>売上</span><span>バック</span><span>勤務時間</span>
+              <span>キャスト</span><span>卓数</span><span>売上</span><span>バック</span><span>大入</span><span>勤務時間</span>
               {isOwner && <><span>通算時給</span><span>本給</span><span>日払い</span><span>源泉徴収</span><span>渡す残額</span></>}
             </div>
             {castRows.map((c) => {
@@ -729,6 +770,7 @@ export default function SalesScreen() {
                   <span>{c.txCount}件</span>
                   <span>¥{c.salesAmount.toLocaleString()}</span>
                   <span className="back-badge">¥{c.backAmount.toLocaleString()}</span>
+                  <span className="oiri-badge">{c.oiriAmount > 0 ? `¥${c.oiriAmount.toLocaleString()}` : '—'}</span>
                   <span>{w ? fmtWorkMin(w.min) : '—'}</span>
                   {isOwner && <>
                     <span>{w && w.labor > 0 ? `¥${Math.round(w.labor).toLocaleString()}` : '—'}</span>
@@ -743,6 +785,7 @@ export default function SalesScreen() {
             <div className={`cast-row-item cast-total ${isOwner ? '' : 'mgr'}`}>
               <span>合計</span><span></span><span></span>
               <span className="back-badge">¥{totalBack.toLocaleString()}</span>
+              <span className="oiri-badge">{summary.totalOiri > 0 ? `¥${summary.totalOiri.toLocaleString()}` : '—'}</span>
               <span></span>
               {isOwner && <>
                 <span>¥{Math.round(totalLabor).toLocaleString()}</span>
@@ -766,6 +809,9 @@ export default function SalesScreen() {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-title">
               {viewTx.seatName}（{new Date(viewTx.completedAt).toLocaleString('ja-JP')}）
+              {(viewTx.headcount ?? (viewTx.solo ? 1 : null)) != null && (
+                <span className="tx-headcount" style={{ marginLeft: 8 }}>{viewTx.headcount ?? 1}人</span>
+              )}
             </div>
             {viewTx.openedAt != null && (
               <div className="tx-view-time">

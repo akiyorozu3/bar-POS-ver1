@@ -9,10 +9,11 @@ import PunchModal from '@/components/PunchModal'
 import PunchManageScreen from '@/components/PunchManageScreen'
 import ShiftScreen from '@/components/ShiftScreen'
 import VaultScreen from '@/components/VaultScreen'
+import DailyReportScreen from '@/components/DailyReportScreen'
 import LoginScreen from '@/components/LoginScreen'
 import { startVersionCheck } from '@/lib/versionCheck'
 
-type Screen = 'order' | 'checkout' | 'sales' | 'vault' | 'shift' | 'menu' | 'cast' | 'punchmgr'
+type Screen = 'order' | 'checkout' | 'sales' | 'vault' | 'shift' | 'daily' | 'menu' | 'cast' | 'punchmgr'
 
 // 打刻をスタッフにも開放（打刻管理タブはオーナーのみのまま）
 const PUNCH_STAFF_ENABLED = true
@@ -43,13 +44,15 @@ export default function App() {
   const {
     user, role, authReady,
     initAuth, signOutUser,
-    subscribeMenus, subscribeCasts, subscribeTables, subscribeClosures, loadFeeSettings, loadBackRate, loadCategoryRates, loadTaxSettings, loadTableNames,
+    subscribeMenus, subscribeCasts, subscribeTables, subscribeClosures, loadFeeSettings, loadBackRate, loadOiriTiers, loadCategoryRates, loadTaxSettings, loadTableNames,
     entryDate, setEntryDate,
   } = usePosStore()
 
   const isOwner = role === 'owner'
-  const canSales = role === 'owner' || role === 'manager'   // 売上管理を開ける権限
-  const canChangeDate = role !== 'staff'                    // ヘッダー日付の変更は owner/manager のみ（staffは常に今日）
+  const isZeimu = role === 'zeimu'                          // 税務（閲覧のみ）
+  const canManage = role === 'owner' || role === 'manager'  // 入力を伴う操作ができる権限（シフト・日払い等）
+  const canSales = canManage || isZeimu                     // 売上管理・金庫を開ける権限（税務は閲覧のみ）
+  const canChangeDate = role !== 'staff'                    // ヘッダー日付の変更は staff 以外（税務は閲覧用に可）
   const backdated = entryDate !== todayStr()
   // ヘッダー日付を ±1日ずらす（未来日は不可）
   const shiftEntryDate = (delta: number) => {
@@ -78,17 +81,22 @@ export default function App() {
     const unsubClosures = subscribeClosures()
     loadFeeSettings()
     loadBackRate()
+    loadOiriTiers()
     loadCategoryRates()
     loadTaxSettings()
     loadTableNames()
     return () => { unsubMenus(); unsubCasts(); unsubTables(); unsubClosures() }
-  }, [user, subscribeMenus, subscribeCasts, subscribeTables, subscribeClosures, loadFeeSettings, loadBackRate, loadCategoryRates, loadTaxSettings, loadTableNames])
+  }, [user, subscribeMenus, subscribeCasts, subscribeTables, subscribeClosures, loadFeeSettings, loadBackRate, loadOiriTiers, loadCategoryRates, loadTaxSettings, loadTableNames])
 
-  // 権限が変わったら、許可されない画面からは注文入力に戻す
+  // 権限が変わったら、許可されない画面からは適切な初期画面に戻す
   useEffect(() => {
-    if ((screen === 'sales' || screen === 'shift' || screen === 'vault') && !canSales) setScreen('order')
-    if ((screen === 'menu' || screen === 'cast' || screen === 'punchmgr') && !isOwner) setScreen('order')
-  }, [isOwner, canSales, screen])
+    const home = isZeimu ? 'sales' : 'order'   // 税務は注文入力を使わないので売上管理をホームに
+    if ((screen === 'sales' || screen === 'vault') && !canSales) setScreen(home)
+    if (screen === 'shift' && !canManage) setScreen(home)
+    if ((screen === 'menu' || screen === 'cast' || screen === 'punchmgr') && !isOwner) setScreen(home)
+    // 税務は注文入力・会計を開けない
+    if ((screen === 'order' || screen === 'checkout') && isZeimu) setScreen('sales')
+  }, [isOwner, isZeimu, canSales, canManage, screen])
 
   // スタッフは日付変更不可＝常に今日に固定。17時の日付切替をまたいでも最新化されるよう定期的に同期
   // （アプリを開きっぱなしで entryDate が前営業日のまま固定される不具合の防止）
@@ -134,7 +142,7 @@ export default function App() {
       {/* トップバー（ユーザー情報・ログアウト） */}
       <div className={`topbar ${backdated ? 'backdated' : ''}`}>
         <span className="topbar-role">
-          {role === 'owner' ? 'オーナー' : role === 'manager' ? 'マネージャー' : 'スタッフ'}
+          {role === 'owner' ? 'オーナー' : role === 'manager' ? 'マネージャー' : role === 'zeimu' ? '税務' : 'スタッフ'}
         </span>
         <label className="topbar-date">
           <span className="topbar-date-lbl">{canChangeDate && backdated ? '遡及入力 ⚠' : '日付'}</span>
@@ -172,17 +180,27 @@ export default function App() {
 
       {/* ナビゲーション */}
       <nav className="nav">
+        {!isZeimu && (
+          <button
+            className={`nav-btn ${screen === 'order' ? 'active' : ''}`}
+            onClick={() => setScreen('order')}
+          >
+            <i className="ti ti-pencil" aria-hidden /> 注文入力
+          </button>
+        )}
+        {!isZeimu && (
+          <button
+            className={`nav-btn ${screen === 'checkout' ? 'active' : ''}`}
+            onClick={() => setScreen('checkout')}
+          >
+            <i className="ti ti-receipt" aria-hidden /> 会計
+          </button>
+        )}
         <button
-          className={`nav-btn ${screen === 'order' ? 'active' : ''}`}
-          onClick={() => setScreen('order')}
+          className={`nav-btn ${screen === 'daily' ? 'active' : ''}`}
+          onClick={() => setScreen('daily')}
         >
-          <i className="ti ti-pencil" aria-hidden /> 注文入力
-        </button>
-        <button
-          className={`nav-btn ${screen === 'checkout' ? 'active' : ''}`}
-          onClick={() => setScreen('checkout')}
-        >
-          <i className="ti ti-receipt" aria-hidden /> 会計
+          <i className="ti ti-notebook" aria-hidden /> 日報
         </button>
         {canSales && (
           <button
@@ -200,7 +218,7 @@ export default function App() {
             <i className="ti ti-building-bank" aria-hidden /> 金庫
           </button>
         )}
-        {canSales && (
+        {canManage && (
           <button
             className={`nav-btn ${screen === 'shift' ? 'active' : ''}`}
             onClick={() => setScreen('shift')}
@@ -242,7 +260,8 @@ export default function App() {
         )}
         {screen === 'sales' && canSales && <SalesScreen />}
         {screen === 'vault' && canSales && <VaultScreen />}
-        {screen === 'shift' && canSales && <ShiftScreen />}
+        {screen === 'daily' && <DailyReportScreen />}
+        {screen === 'shift' && canManage && <ShiftScreen />}
         {screen === 'menu' && isOwner && <MenuManageScreen />}
         {screen === 'cast' && isOwner && <CastManageScreen />}
         {screen === 'punchmgr' && isOwner && <PunchManageScreen />}

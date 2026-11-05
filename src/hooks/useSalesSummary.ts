@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import type { Transaction, SalesSummary, PayMethod } from '@/types'
-import { usePosStore } from '@/store/posStore'
+import { usePosStore, dateStrOf } from '@/store/posStore'
 import { DRINK_BACK_CATEGORY, DRINK_BACK_CATEGORIES } from '@/lib/defaultMenus'
+import { oiriConfigOn, oiriForDay, groupByBusinessDay } from '@/lib/oiri'
 
 const PAY_METHODS: PayMethod[] = ['cash', 'card', 'qr']
 
@@ -16,6 +17,7 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
   const drinkBackRate = usePosStore((s) => s.drinkBackRate)  // ドリンクバック率
   const menus = usePosStore((s) => s.menus)                  // 保険用：現行メニューの円バック参照
   const casts = usePosStore((s) => s.casts)                  // バック集計しないキャスト判定用
+  const oiriTiers = usePosStore((s) => s.oiriTiers)          // 大入の設定（適用日付き）
   return useMemo(() => {
     // バック集計しないキャスト（名前で判定・改名前の別名も含む）。卓バック・ドリンクバックを0扱いにする。
     const noBackNames = new Set(
@@ -31,10 +33,10 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
       PAY_METHODS.map((m) => [m, { count: 0, sales: 0, fee: 0, net: 0 }])
     ) as SalesSummary['byMethod']
 
-    // キャスト別の集計。salesAmount は担当した卓・ドリンクの売上、backRaw は丸め前のバック額。
-    const castMap: Record<string, { txCount: number; salesAmount: number; backRaw: number }> = {}
+    // キャスト別の集計。salesAmount は担当した卓・ドリンクの売上、backRaw は丸め前のバック額、oiri は大入。
+    const castMap: Record<string, { txCount: number; salesAmount: number; backRaw: number; oiri: number }> = {}
     const UNASSIGNED = '未設定'
-    const ensure = (c: string) => (castMap[c] ??= { txCount: 0, salesAmount: 0, backRaw: 0 })
+    const ensure = (c: string) => (castMap[c] ??= { txCount: 0, salesAmount: 0, backRaw: 0, oiri: 0 })
 
     let totalSales = 0
     let totalFee = 0
@@ -43,7 +45,8 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
     for (const t of transactions) {
       totalSales += t.total
       totalFee += t.feeAmount
-      if (t.solo) soloCount++
+      // 一人客＝人数1（旧データは headcount 無し→solo フラグで判定）
+      if (t.headcount != null ? t.headcount === 1 : t.solo) soloCount++
 
       // 支払い方法別の集計。分割支払いは内訳（payments）を各方法へ振り分ける。
       if (t.payments && t.payments.length) {
@@ -106,6 +109,15 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
       }
     }
 
+    // 大入：営業日ごとに「売上合計→原資→売上シェアで按分」。各営業日は当時有効な設定を使う（遡及しない）。
+    let totalOiri = 0
+    for (const [dateStr, txs] of groupByBusinessDay(transactions, dateStrOf)) {
+      const cfg = oiriConfigOn(oiriTiers, dateStr)
+      const { perCast, total } = oiriForDay(txs, cfg)
+      totalOiri += total
+      for (const [name, amt] of perCast) ensure(name).oiri += amt
+    }
+
     const totalNet = totalSales - totalFee
     const txCount = transactions.length
     const avgPerCustomer = txCount > 0 ? Math.round(totalSales / txCount) : 0
@@ -118,6 +130,7 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
         txCount: v.txCount,
         salesAmount: Math.round(v.salesAmount),
         backAmount: Math.round(v.backRaw),
+        oiriAmount: Math.round(v.oiri),
       }))
       .sort((a, b) => b.salesAmount - a.salesAmount)
 
@@ -130,7 +143,8 @@ export function useSalesSummary(transactions: Transaction[]): SalesSummary {
       soloCount,
       byMethod,
       castSummaries,
+      totalOiri,
       transactions,
     }
-  }, [transactions, backRate, drinkBackRate, menus, casts])
+  }, [transactions, backRate, drinkBackRate, menus, casts, oiriTiers])
 }

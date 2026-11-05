@@ -11,7 +11,7 @@ export function buildTransactionCSV(transactions: Transaction[]): string {
   const headers = [
     '日時',
     '席名',
-    '一人客',
+    '人数',
     '支払い方法',
     '税抜売上',
     '消費税',
@@ -25,7 +25,7 @@ export function buildTransactionCSV(transactions: Transaction[]): string {
   const rows = transactions.map((t) => [
     new Date(t.completedAt).toLocaleString('ja-JP'),
     t.seatName,
-    t.solo ? '○' : '',
+    t.headcount ?? (t.solo ? 1 : ''),
     t.payments?.length
       ? '分割（' + t.payments.map((p) => `${PAY_LABEL[p.method] ?? p.method}¥${p.amount.toLocaleString()}`).join('／') + '）'
       : PAY_LABEL[t.payMethod] ?? t.payMethod,
@@ -43,12 +43,13 @@ export function buildTransactionCSV(transactions: Transaction[]): string {
 
 /** キャストバック集計CSVを生成 */
 export function buildCastCSV(summary: SalesSummary): string {
-  const headers = ['キャスト', '卓数', '売上合計', 'バック額']
+  const headers = ['キャスト', '卓数', '売上合計', 'バック額', '大入']
   const rows = summary.castSummaries.map((c) => [
     c.name,
     c.txCount,
     c.salesAmount,
     c.backAmount,
+    c.oiriAmount,
   ])
   return buildCSV([headers, ...rows])
 }

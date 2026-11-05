@@ -2,7 +2,8 @@
 export interface Seat {
   id: string
   name: string
-  solo: boolean          // 一人客フラグ
+  solo: boolean          // （旧）一人客フラグ。人数入力に置き換え。互換のため保持
+  headcount: number      // 人数（来店人数。既定1）
   tableCasts: string[]   // 卓の担当キャスト（複数可。卓バックを頭割り）
   createdAt: number
 }
@@ -92,7 +93,7 @@ export interface PaymentSplit {
 
 // ── ユーザー権限 ─────────────────────────────────
 // owner=全権 / manager=売上管理の閲覧＋日払い/大入・経費（取引明細は閲覧のみ）/ staff=注文・会計のみ
-export type Role = 'owner' | 'manager' | 'staff'
+export type Role = 'owner' | 'manager' | 'staff' | 'zeimu'
 
 // ── 税の扱い ─────────────────────────────────────
 // exclusive: 税抜で登録し会計時に加算 / inclusive: 税込で登録し加算しない
@@ -106,7 +107,8 @@ export interface TaxSettings {
 export interface Transaction {
   id: string
   seatName: string
-  solo: boolean
+  solo: boolean          // （旧）一人客フラグ。互換のため保持（headcount===1で代替）
+  headcount: number      // 人数（来店人数）
   items: OrderItem[]
   subtotal: number     // 税抜合計
   tax: number
@@ -127,6 +129,22 @@ export interface Transaction {
 export interface FeeSettings {
   card: number   // %
   qr: number     // %
+}
+
+// ── 日報 ─────────────────────────────────────────
+export interface DailyReport {
+  id: string
+  date: string            // 営業日 YYYY-MM-DD
+  author: string          // 担当者
+  openTime: string        // 営業開始（例 '19:00'）
+  closeTime: string       // 営業終了（例 '05:00'）
+  cash: number            // 売上金 現金
+  card: number            // 売上金 カード
+  qr: number              // 売上金 QR
+  registerCash: number    // レジ金
+  orders: string          // 発注（フリー入力）
+  notes: string           // 引継事項・備考（フリー入力）
+  createdAt: number       // 作成時刻
 }
 
 // ── 日払い/大入 ──────────────────────────────────
@@ -205,6 +223,7 @@ export interface CastSummary {
   txCount: number
   salesAmount: number
   backAmount: number
+  oiriAmount: number   // 大入（売上合計の閾値達成時に、売上シェアで按分した自動計算額）
 }
 
 // ── 売上サマリー ─────────────────────────────────
@@ -217,5 +236,17 @@ export interface SalesSummary {
   soloCount: number
   byMethod: Record<PayMethod, { count: number; sales: number; fee: number; net: number }>
   castSummaries: CastSummary[]
+  totalOiri: number    // 期間内の大入合計（各営業日ごとに算出し合算）
   transactions: Transaction[]
+}
+
+// ── 大入の設定（適用日付き。過去分へは遡及しない） ────────────
+// 1営業日の売上合計が tier1Threshold 以上で tier1Amount、tier2Threshold 以上で tier2Amount を
+// 「大入の原資」とし、各キャストの売上シェアで按分する。amount は後から変更可。
+export interface OiriTier {
+  from: string            // この設定が有効になる営業日（YYYY-MM-DD）。この日以降に適用
+  tier1Threshold: number  // 例 150000（15万以上）
+  tier1Amount: number     // 例 20000（2万）
+  tier2Threshold: number  // 例 250000（25万以上）
+  tier2Amount: number     // 例 30000（3万）
 }

@@ -7,8 +7,9 @@
 //   − 日払い・大入
 // 手動（CashEntry）:
 //   ＋ カード/QR入金、± その他、− 給与・人件費 など
-import type { Transaction, Expense, RecurringExpense, Payout, CashEntry } from '@/types'
+import type { Transaction, Expense, RecurringExpense, Payout, CashEntry, OiriTier } from '@/types'
 import { dateStrOf } from '@/store/posStore'
+import { oiriConfigOn, oiriForDay, groupByBusinessDay } from '@/lib/oiri'
 
 export type MovementKind = 'cash-sales' | 'expense' | 'payout' | 'manual'
 
@@ -30,6 +31,7 @@ interface BuildParams {
   recurringExpenses: RecurringExpense[]
   payouts: Payout[]
   cashEntries: CashEntry[]
+  oiriTiers: OiriTier[]
 }
 
 // 1取引の現金分（分割は現金の内訳だけ、単一は現金会計のみ）
@@ -78,11 +80,21 @@ export function buildMovements(p: BuildParams): Movement[] {
     }
   }
 
-  // ④ 日払い・大入（出金）
+  // ④ 日払い（手動・出金）。大入(payout)は設定の無い過去日だけ採用（下の自動大入と二重計上しない）。
   for (const po of p.payouts) {
     if (!inRange(po.date)) continue
+    if (po.type === 'oiri' && oiriConfigOn(p.oiriTiers, po.date)) continue
     const tag = po.type === 'oiri' ? '大入' : '日払い'
     out.push({ date: po.date, label: `${tag}　${po.name}`, kind: 'payout', amount: -Math.abs(po.amount), auto: true })
+  }
+
+  // ④' 大入（自動計算・出金）。営業日ごとに売上から算出。設定のある日だけ。
+  for (const [d, txs] of groupByBusinessDay(p.transactions, dateStrOf)) {
+    if (!inRange(d)) continue
+    const cfg = oiriConfigOn(p.oiriTiers, d)
+    if (!cfg) continue
+    const total = oiriForDay(txs, cfg).total
+    if (total > 0) out.push({ date: d, label: '大入（自動）', kind: 'payout', amount: -total, auto: true })
   }
 
   // ⑤ 手動入出金（符号込み）

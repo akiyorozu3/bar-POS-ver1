@@ -128,12 +128,12 @@ export default function OrderScreen() {
         {(() => {
           const open = new Set(seats.map((s) => s.name).filter(Boolean))
           return tableNames.filter((n) => !open.has(n)).map((n) => (
-            <button key={n} className="seat-chip quick" onClick={() => addSeat(n, false)}>
+            <button key={n} className="seat-chip quick" onClick={() => addSeat(n)}>
               {n}
             </button>
           ))
         })()}
-        <button className="seat-chip add" onClick={() => addSeat('', false)}>
+        <button className="seat-chip add" onClick={() => addSeat('')}>
           ＋ 追加
         </button>
         {isOwner && (
@@ -284,12 +284,6 @@ export default function OrderScreen() {
                 value={seat?.name ?? ''}
                 onChange={(e) => seat && updateSeat(seat.id, { name: e.target.value })}
               />
-              <button
-                className={`solo-toggle ${seat?.solo ? 'on' : ''}`}
-                onClick={() => seat && updateSeat(seat.id, { solo: !seat.solo })}
-              >
-                {seat?.solo ? '一人客 ✓' : '一人客'}
-              </button>
             </div>
             <div className="cast-row">
               <span className="cast-lbl">卓の担当</span>
@@ -325,6 +319,33 @@ export default function OrderScreen() {
                   onClick={() => seat && setTableCasts(seat.id, [...(seat.tableCasts.length ? seat.tableCasts : ['']), ''])}
                   title="担当を追加"
                 >＋担当</button>
+              </div>
+            </div>
+            <div className="cast-row">
+              <span className="cast-lbl">人数</span>
+              <div className="headcount-input">
+                <button
+                  className="hc-step"
+                  onClick={() => seat && updateSeat(seat.id, { headcount: Math.max(1, (seat.headcount ?? 1) - 1) })}
+                  aria-label="人数を減らす"
+                >−</button>
+                <input
+                  type="number"
+                  min="1"
+                  inputMode="numeric"
+                  value={seat?.headcount ?? 1}
+                  onChange={(e) => {
+                    if (!seat) return
+                    const n = parseInt(e.target.value, 10)
+                    updateSeat(seat.id, { headcount: Number.isFinite(n) && n >= 1 ? n : 1 })
+                  }}
+                />
+                <button
+                  className="hc-step"
+                  onClick={() => seat && updateSeat(seat.id, { headcount: (seat.headcount ?? 1) + 1 })}
+                  aria-label="人数を増やす"
+                >＋</button>
+                <span className="hc-unit">人</span>
               </div>
             </div>
           </div>

@@ -43,4 +43,5 @@ export const COLLECTIONS = {
   SHIFT_SETTINGS: 'shiftSettings',
   CASH_ENTRIES: 'cashEntries',
   CASH_SETTINGS: 'cashSettings',
+  DAILY_REPORTS: 'dailyReports',
 } as const

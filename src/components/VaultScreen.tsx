@@ -19,13 +19,14 @@ const monthLabel = (m: string) => { const [y, mo] = m.split('-'); return `${y}�
 
 export default function VaultScreen() {
   const {
-    transactions, expenses, recurringExpenses, payouts, cashEntries, cashOpening,
+    transactions, expenses, recurringExpenses, payouts, cashEntries, cashOpening, oiriTiers,
     subscribeTransactions, subscribeExpenses, subscribePayouts, subscribeRecurringExpenses,
     subscribeCashEntries, subscribeCashSettings,
     addCashEntry, deleteCashEntry, saveCashOpening, addExpense, deleteExpense,
-    addRecurringExpense, deleteRecurringExpense,
+    addRecurringExpense, deleteRecurringExpense, role,
   } = usePosStore()
 
+  const isReadOnly = role === 'zeimu'   // 税務：残高照会・履歴照会のみ（入力・編集・削除不可）
   const today = todayStr()
   const openingDate = cashOpening.openingDate
 
@@ -46,8 +47,8 @@ export default function VaultScreen() {
   }, [openingDate, subscribeTransactions, subscribeExpenses, subscribePayouts, subscribeCashEntries])
 
   const movements = useMemo(() => buildMovements({
-    openingDate, today, transactions, expenses, recurringExpenses, payouts, cashEntries,
-  }), [openingDate, today, transactions, expenses, recurringExpenses, payouts, cashEntries])
+    openingDate, today, transactions, expenses, recurringExpenses, payouts, cashEntries, oiriTiers,
+  }), [openingDate, today, transactions, expenses, recurringExpenses, payouts, cashEntries, oiriTiers])
 
   const currentBalance = cashOpening.openingBalance + movements.reduce((a, m) => a + m.amount, 0)
 
@@ -113,14 +114,16 @@ export default function VaultScreen() {
             <span className="vault-taxheld">うち源泉徴収 預かり（未納） {yen(taxHeld)}</span>
           )}
         </div>
-        <div className="vault-head-btns">
-          <button className="vault-opening-btn" onClick={() => setShowRecurring((v) => !v)}>固定費</button>
-          <button className="vault-opening-btn" onClick={() => setShowOpening((v) => !v)}>期首残高</button>
-        </div>
+        {!isReadOnly && (
+          <div className="vault-head-btns">
+            <button className="vault-opening-btn" onClick={() => setShowRecurring((v) => !v)}>固定費</button>
+            <button className="vault-opening-btn" onClick={() => setShowOpening((v) => !v)}>期首残高</button>
+          </div>
+        )}
       </div>
 
-      {showOpening && <OpeningEditor initBalance={cashOpening.openingBalance} initDate={openingDate} onSave={saveCashOpening} onClose={() => setShowOpening(false)} />}
-      {showRecurring && (
+      {!isReadOnly && showOpening && <OpeningEditor initBalance={cashOpening.openingBalance} initDate={openingDate} onSave={saveCashOpening} onClose={() => setShowOpening(false)} />}
+      {!isReadOnly && showRecurring && (
         <RecurringEditor
           items={recurringExpenses}
           onAdd={addRecurringExpense}
@@ -129,7 +132,8 @@ export default function VaultScreen() {
         />
       )}
 
-      {/* 追加フォーム */}
+      {/* 追加フォーム（税務は非表示） */}
+      {!isReadOnly && (
       <div className="vault-add">
         <div className="vault-add-title">入出金を追加（カード/QR入金・経費・給与出金 など）</div>
         <div className="vault-add-row">
@@ -154,6 +158,7 @@ export default function VaultScreen() {
         </div>
         <div className="vault-hint">現金売上・日払い・大入は自動反映（下の台帳に「自動」表示）。カード/QR売上は入金時にここで手入力。経費はここから入力でき、売上管理の経費＝純利益にも反映されます（削除・編集は「売上管理→経費」から）。給与を手取りで払ったら「うち源泉」に預かり額を入れると「源泉徴収 預かり（未納）」に積み上がり、税務署へ払ったら区分「源泉納付」で出金すると減ります。</div>
       </div>
+      )}
 
       {/* 月ナビ＋サマリー */}
       <div className="vault-month-nav">
@@ -185,7 +190,7 @@ export default function VaultScreen() {
                 <td className="in">{r.amount > 0 ? yen(r.amount) : ''}</td>
                 <td className="out">{r.amount < 0 ? yen(-r.amount) : ''}</td>
                 <td className={r.balance < 0 ? 'minus' : ''}>{yen(r.balance)}</td>
-                <td>{(r.entryId || r.expenseId) && (
+                <td>{!isReadOnly && (r.entryId || r.expenseId) && (
                   <button className="vault-del" onClick={() => r.entryId ? deleteCashEntry(r.entryId) : deleteExpense(r.expenseId!)} title="削除">×</button>
                 )}</td>
               </tr>
