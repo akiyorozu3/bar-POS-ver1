@@ -174,7 +174,8 @@ export default function VaultScreen() {
         <span className="end">月末残高 {yen(monthEnd)}</span>
       </div>
 
-      {/* 台帳 */}
+      {/* 台帳（税務は非表示：残高・集計のみ） */}
+      {!isReadOnly && (
       <div className="vault-table-wrap">
         <table className="vault-table">
           <thead>
@@ -199,6 +200,7 @@ export default function VaultScreen() {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   )
 }

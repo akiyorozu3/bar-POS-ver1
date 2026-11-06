@@ -22,6 +22,9 @@ const PAY_METHOD_CLS: Record<PayMethod, string> = {
 const txPayLabel = (t: Transaction) => (t.payments?.length ? '分割' : PAY_LABEL[t.payMethod])
 const txPayCls = (t: Transaction) => (t.payments?.length ? 'method-split' : PAY_METHOD_CLS[t.payMethod])
 
+// 十円未満を四捨五入（キャストバック集計の大入・渡す残額の表示用）
+const round10 = (n: number) => Math.round(n / 10) * 10
+
 // 滞在時間（ミリ秒 → 「2時間15分」）。0以下は空文字
 function fmtDur(ms: number): string {
   if (!(ms > 0)) return ''
@@ -54,6 +57,7 @@ export default function SalesScreen() {
   const { transactions, transactionsLoading, subscribeTransactions, feeSettings, saveFeeSettings, backRate, drinkBackRate, backThreshold, saveBackRate, oiriTiers, saveOiriTiers, taxRate, taxMode, saveTaxSettings, seats, orders, closedDates, closeDay, reopenDay, entryDate, casts, payouts, subscribePayouts, addPayout, deletePayout, deleteTransaction, restoreTransaction, role, expenses, recurringExpenses, subscribeExpenses, subscribeRecurringExpenses, menus, punches, subscribePunches } = usePosStore()
   const isOwner = role === 'owner'
   const isReadOnly = role === 'zeimu'   // 税務：閲覧のみ（入力・削除不可）
+  const showFullCast = isOwner || isReadOnly   // キャストバック集計：オーナー・税務はフル列（通算時給/本給/源泉徴収/渡す残額）
   const [period, setPeriod] = useState<Period>('today')
   const [customFrom, setCustomFrom] = useState(todayStr())
   const [customTo, setCustomTo] = useState(todayStr())
@@ -757,48 +761,48 @@ export default function SalesScreen() {
         <div>
           <div className="section-title">キャストバック集計</div>
           <div className="cast-table">
-            <div className={`cast-head ${isOwner ? '' : 'mgr'}`}>
+            <div className={`cast-head ${showFullCast ? '' : 'mgr'}`}>
               <span>キャスト</span><span>卓数</span><span>売上</span><span>バック</span><span>大入</span><span>勤務時間</span>
-              {isOwner && <><span>通算時給</span><span>本給</span><span>日払い</span><span>源泉徴収</span><span>渡す残額</span></>}
+              {showFullCast && <><span>通算時給</span><span>本給</span><span>日払い</span><span>源泉徴収</span><span>渡す残額</span></>}
             </div>
             {castRows.map((c) => {
               const w = laborByName.get(c.name)
               const cc = castCalc(c.name, c.backAmount)
               return (
-                <div key={c.name} className={`cast-row-item ${isOwner ? '' : 'mgr'}`}>
+                <div key={c.name} className={`cast-row-item ${showFullCast ? '' : 'mgr'}`}>
                   <span>{c.name}</span>
                   <span>{c.txCount}件</span>
                   <span>¥{c.salesAmount.toLocaleString()}</span>
                   <span className="back-badge">¥{c.backAmount.toLocaleString()}</span>
-                  <span className="oiri-badge">{c.oiriAmount > 0 ? `¥${c.oiriAmount.toLocaleString()}` : '—'}</span>
+                  <span className="oiri-badge">{c.oiriAmount > 0 ? `¥${round10(c.oiriAmount).toLocaleString()}` : '—'}</span>
                   <span>{w ? fmtWorkMin(w.min) : '—'}</span>
-                  {isOwner && <>
+                  {showFullCast && <>
                     <span>{w && w.labor > 0 ? `¥${Math.round(w.labor).toLocaleString()}` : '—'}</span>
                     <span>¥{Math.round(cc.honkyu).toLocaleString()}</span>
                     <span>{cc.daily > 0 ? `−¥${cc.daily.toLocaleString()}` : '—'}</span>
                     <span>{cc.withhold > 0 ? `−¥${cc.withhold.toLocaleString()}` : '—'}</span>
-                    <span className="payout-cell">¥{Math.round(cc.payout).toLocaleString()}</span>
+                    <span className="payout-cell">¥{round10(cc.payout).toLocaleString()}</span>
                   </>}
                 </div>
               )
             })}
-            <div className={`cast-row-item cast-total ${isOwner ? '' : 'mgr'}`}>
+            <div className={`cast-row-item cast-total ${showFullCast ? '' : 'mgr'}`}>
               <span>合計</span><span></span><span></span>
               <span className="back-badge">¥{totalBack.toLocaleString()}</span>
-              <span className="oiri-badge">{summary.totalOiri > 0 ? `¥${summary.totalOiri.toLocaleString()}` : '—'}</span>
+              <span className="oiri-badge">{summary.totalOiri > 0 ? `¥${round10(summary.totalOiri).toLocaleString()}` : '—'}</span>
               <span></span>
-              {isOwner && <>
+              {showFullCast && <>
                 <span>¥{Math.round(totalLabor).toLocaleString()}</span>
                 <span>¥{Math.round(totalHonkyu).toLocaleString()}</span>
                 <span>{totalDaily > 0 ? `−¥${totalDaily.toLocaleString()}` : ''}</span>
                 <span>{totalWithhold > 0 ? `−¥${totalWithhold.toLocaleString()}` : ''}</span>
-                <span className="payout-cell">¥{Math.round(totalPayout).toLocaleString()}</span>
+                <span className="payout-cell">¥{round10(totalPayout).toLocaleString()}</span>
               </>}
             </div>
           </div>
-          {isOwner && (
+          {showFullCast && (
             <div className="mm-note" style={{ paddingTop: 6 }}>
-              本給＝通算時給＋バック。源泉徴収＝(通算時給＋バック)×10%（「源泉徴収する」キャストのみ）。渡す残額＝本給−日払い−源泉徴収（大入は含めない）。日払いはキャスト名で突合。
+              本給＝通算時給＋バック。源泉徴収＝(通算時給＋バック)×10%（「源泉徴収する」キャストのみ）。渡す残額＝本給−日払い−源泉徴収（大入は含めない）。日払いはキャスト名で突合。大入・渡す残額は十円未満を四捨五入して表示（通算時給・本給・源泉徴収は円単位のまま）。
             </div>
           )}
         </div>
