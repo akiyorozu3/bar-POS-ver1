@@ -507,6 +507,24 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
   box-shadow: 0 2px 6px rgba(0,0,0,0.2);
 }
 
+/* 店識別バンド（店ごとに色と店名を出して取り違えを防ぐ。色・店名は env で指定） */
+.store-band {
+  position: sticky;
+  top: 0;
+  z-index: 999;
+  color: #fff;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 10px;
+  letter-spacing: 0.06em;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
 /* ── シフト管理 ──────────────────────────────── */
 .shift-screen { padding: 12px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
 .shift-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }

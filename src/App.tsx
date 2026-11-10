@@ -29,6 +29,20 @@ function TestEnvBanner() {
   )
 }
 
+// 店識別バンド：env で店名/帯色が指定された店だけ、画面上部に常時表示して取り違えを防ぐ。
+// 1店目など未設定の店では何も出さない（現状のまま）。
+const STORE_NAME = import.meta.env.VITE_STORE_NAME as string | undefined
+const STORE_COLOR = (import.meta.env.VITE_STORE_COLOR as string | undefined) || '#378add'
+
+function StoreBand() {
+  if (!STORE_NAME) return null
+  return (
+    <div className="store-band" style={{ background: STORE_COLOR }}>
+      <i className="ti ti-building-store" aria-hidden /> {STORE_NAME}
+    </div>
+  )
+}
+
 const readScreen = (): Screen => {
   try { return (localStorage.getItem('pos:screen') as Screen) || 'order' } catch { return 'order' }
 }
@@ -126,6 +140,7 @@ export default function App() {
   // 未ログイン
   if (!user) return (
     <>
+      <StoreBand />
       {IS_TEST_ENV && <TestEnvBanner />}
       <LoginScreen />
     </>
@@ -138,6 +153,7 @@ export default function App() {
           🔄 新しいバージョンがあります — タップして更新
         </div>
       )}
+      <StoreBand />
       {IS_TEST_ENV && <TestEnvBanner />}
       {/* トップバー（ユーザー情報・ログアウト） */}
       <div className={`topbar ${backdated ? 'backdated' : ''}`}>
