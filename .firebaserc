@@ -1,6 +1,7 @@
 {
   "projects": {
     "default": "bar-pos-b1993",
-    "staging": "bar-pos-staging"
+    "staging": "bar-pos-staging",
+    "concafe": "bar-pos-concafe"
   }
 }
