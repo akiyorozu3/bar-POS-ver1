@@ -34,7 +34,7 @@ const DOMAIN = env.VITE_AUTH_ID_DOMAIN || 'bar-pos.local'
 // ここで作る初期アカウントと「仮」パスワード。開店前に必ず変更すること。
 const ACCOUNTS = [
   { id: env.VITE_OWNER_ID || 'owner', password: 'concafe-owner-2026' },
-  { id: env.VITE_MANAGER_ID || 'manager', password: 'concafe-mgr-2026' },
+  { id: env.VITE_MANAGER_ID || 'manager', password: 'concafe-manager-2026' },
   { id: 'staff', password: 'concafe-staff-2026' },
   { id: env.VITE_ZEIMU_ID || 'zeimu', password: 'concafe-zeimu-2026' },
 ]
