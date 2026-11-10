@@ -13,8 +13,9 @@ export default function ShiftScreen() {
   const {
     casts: allCasts, shifts, shiftWeeks, shiftCastOrder,
     subscribeShifts, subscribeShiftWeeks, subscribeShiftOrder, saveShiftOrder,
-    saveShift, deleteShift, setWeekConfirmed,
+    saveShift, deleteShift, setWeekConfirmed, role,
   } = usePosStore()
+  const isReadOnly = role === 'zeimu'   // 税務：閲覧のみ（並べ替え・編集・確定・コピー不可）
   // 在籍中のキャストだけシフト表に出す（在籍外＝active:false は非表示。注文・打刻には影響しない）。
   // 並びはシフト表専用の順（shiftCastOrder）。未登録の人は末尾に sortOrder 順で付ける。
   const casts = useMemo(() => {
@@ -47,6 +48,7 @@ export default function ShiftScreen() {
 
   // ▲▼：表示中の並び（casts）で target を dir 方向へ移動し、その全体順を保存
   const moveRow = (castId: string, dir: -1 | 1) => {
+    if (isReadOnly) return
     const ids = casts.map((c) => c.id)
     const i = ids.indexOf(castId)
     const j = i + dir
@@ -112,12 +114,14 @@ export default function ShiftScreen() {
           {confirmed
             ? <span className="shift-badge confirmed">確定済み</span>
             : <span className="shift-badge draft">未確定</span>}
-          <button
-            className={`shift-confirm-btn ${confirmed ? 'undo' : ''}`}
-            onClick={() => setWeekConfirmed(weekId, !confirmed)}
-          >
-            {confirmed ? '確定を解除' : '週を確定'}
-          </button>
+          {!isReadOnly && (
+            <button
+              className={`shift-confirm-btn ${confirmed ? 'undo' : ''}`}
+              onClick={() => setWeekConfirmed(weekId, !confirmed)}
+            >
+              {confirmed ? '確定を解除' : '週を確定'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -164,10 +168,12 @@ export default function ShiftScreen() {
                   <tr key={c.id}>
                     <th className="sh-name">
                       <div className="sh-name-inner">
-                        <span className="sh-move">
-                          <button className="sh-move-btn" onClick={() => moveRow(c.id, -1)} disabled={ri === 0} aria-label="上へ">▲</button>
-                          <button className="sh-move-btn" onClick={() => moveRow(c.id, 1)} disabled={ri === casts.length - 1} aria-label="下へ">▼</button>
-                        </span>
+                        {!isReadOnly && (
+                          <span className="sh-move">
+                            <button className="sh-move-btn" onClick={() => moveRow(c.id, -1)} disabled={ri === 0} aria-label="上へ">▲</button>
+                            <button className="sh-move-btn" onClick={() => moveRow(c.id, 1)} disabled={ri === casts.length - 1} aria-label="下へ">▼</button>
+                          </span>
+                        )}
                         <span className="sh-name-label">{castLabel(c)}</span>
                       </div>
                     </th>
@@ -177,10 +183,10 @@ export default function ShiftScreen() {
                       return (
                         <td
                           key={ds}
-                          className={`sh-cell ${s ? 'on' : 'off'} ${ds === today ? 'today' : ''} ${clip ? 'pasting' : ''}`}
-                          onClick={() => clip
+                          className={`sh-cell ${s ? 'on' : 'off'} ${ds === today ? 'today' : ''} ${clip ? 'pasting' : ''} ${isReadOnly ? 'readonly' : ''}`}
+                          onClick={() => { if (isReadOnly) return; clip
                             ? saveShift(c.id, ds, clip)
-                            : setEditing({ castId: c.id, castName: castLabel(c), date: ds, dateLabel: dayLabel(d) })}
+                            : setEditing({ castId: c.id, castName: castLabel(c), date: ds, dateLabel: dayLabel(d) }) }}
                         >
                           {s ? (
                             <>
@@ -220,7 +226,11 @@ export default function ShiftScreen() {
         </div>
       )}
 
-      <p className="shift-hint">セルをタップして編集。「コピー」→ 貼り付けたいセルをタップで同じ時間を素早く入力。休みは「休みにする」。</p>
+      <p className="shift-hint">
+        {isReadOnly
+          ? '※ 閲覧のみ（シフトの編集・確定はできません）。'
+          : 'セルをタップして編集。「コピー」→ 貼り付けたいセルをタップで同じ時間を素早く入力。休みは「休みにする」。'}
+      </p>
 
       {editing && (
         <ShiftEditModal

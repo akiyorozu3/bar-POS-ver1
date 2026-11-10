@@ -80,16 +80,19 @@ service cloud.firestore {
       allow write: if canSales();
     }
 
-    // 予定シフト・シフト週：オーナー・マネージャーのみ（閲覧・編集）
+    // 予定シフト・シフト週：閲覧は owner/manager/税務（税務は閲覧のみ）／編集は owner/manager
     match /shifts/{id} {
-      allow read, write: if canSales();
+      allow read: if canViewFinance();
+      allow write: if canSales();
     }
     match /shiftWeeks/{id} {
-      allow read, write: if canSales();
+      allow read: if canViewFinance();
+      allow write: if canSales();
     }
     // シフト表専用のキャスト並び順（owner/manager が変更可。casts本体はオーナーのみなので別管理）
     match /shiftSettings/{id} {
-      allow read, write: if canSales();
+      allow read: if canViewFinance();
+      allow write: if canSales();
     }
     // 金庫（お金の残高台帳）：閲覧はオーナー・マネージャー・税務（残高/履歴照会）／入出金・期首残高はオーナー・マネージャー
     match /cashEntries/{id} {

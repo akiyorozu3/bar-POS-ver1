@@ -544,6 +544,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .sh-cell.off { color: #bbb; }
 .sh-cell.today { outline: 1.5px solid #93c5fd; outline-offset: -2px; }
 .sh-cell:hover { background: #e2eefc; }
+.sh-cell.readonly { cursor: default; }
+.sh-cell.readonly:hover { background: inherit; }
 .sh-cell.pasting { cursor: copy; }
 .sh-cell.pasting:hover { background: #dcf3e3; outline: 1.5px dashed #4a9d6a; outline-offset: -2px; }
 /* コピー中バー */

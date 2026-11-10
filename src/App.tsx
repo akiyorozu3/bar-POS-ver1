@@ -92,7 +92,7 @@ export default function App() {
   useEffect(() => {
     const home = isZeimu ? 'sales' : 'order'   // 税務は注文入力を使わないので売上管理をホームに
     if ((screen === 'sales' || screen === 'vault') && !canSales) setScreen(home)
-    if (screen === 'shift' && !canManage) setScreen(home)
+    if (screen === 'shift' && !canSales) setScreen(home)   // シフトは owner/manager/zeimu（zeimuは閲覧のみ）
     if ((screen === 'menu' || screen === 'cast' || screen === 'punchmgr') && !isOwner) setScreen(home)
     // 税務は注文入力・会計を開けない
     if ((screen === 'order' || screen === 'checkout') && isZeimu) setScreen('sales')
@@ -218,7 +218,7 @@ export default function App() {
             <i className="ti ti-building-bank" aria-hidden /> 金庫
           </button>
         )}
-        {canManage && (
+        {canSales && (
           <button
             className={`nav-btn ${screen === 'shift' ? 'active' : ''}`}
             onClick={() => setScreen('shift')}
@@ -261,7 +261,7 @@ export default function App() {
         {screen === 'sales' && canSales && <SalesScreen />}
         {screen === 'vault' && canSales && <VaultScreen />}
         {screen === 'daily' && <DailyReportScreen />}
-        {screen === 'shift' && canManage && <ShiftScreen />}
+        {screen === 'shift' && canSales && <ShiftScreen />}
         {screen === 'menu' && isOwner && <MenuManageScreen />}
         {screen === 'cast' && isOwner && <CastManageScreen />}
         {screen === 'punchmgr' && isOwner && <PunchManageScreen />}
