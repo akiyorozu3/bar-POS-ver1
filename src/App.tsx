@@ -43,6 +43,24 @@ function StoreBand() {
   )
 }
 
+// 店色（VITE_STORE_COLOR）が指定された店では、アプリ全体のアクセント（既定の青）を店色へ差し替える。
+// 濃い変種（テキスト用）は店色を少し暗くして自動生成。未指定の店は :root の青のまま。
+const STORE_ACCENT = import.meta.env.VITE_STORE_COLOR as string | undefined
+function darkenHex(hex: string, amt = 0.78): string {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex.trim())
+  if (!m) return hex
+  const n = parseInt(m[1], 16)
+  const r = Math.round(((n >> 16) & 255) * amt)
+  const g = Math.round(((n >> 8) & 255) * amt)
+  const b = Math.round((n & 255) * amt)
+  return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)
+}
+if (STORE_ACCENT && typeof document !== 'undefined') {
+  const root = document.documentElement
+  root.style.setProperty('--accent', STORE_ACCENT)
+  root.style.setProperty('--accent-strong', darkenHex(STORE_ACCENT))
+}
+
 const readScreen = (): Screen => {
   try { return (localStorage.getItem('pos:screen') as Screen) || 'order' } catch { return 'order' }
 }
