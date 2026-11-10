@@ -1,6 +1,6 @@
 /* ── リセット ─────────────────────────────────── */
 /* アクセント色（店の基調色）。既定は青。店ごとに App.tsx が env の店色で上書きする。 */
-:root { --accent: var(--accent); --accent-strong: var(--accent-strong); }
+:root { --accent: #378add; --accent-strong: #185fa5; }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; background: #f0eeea; color: #1a1a18; -webkit-tap-highlight-color: transparent; }
 
