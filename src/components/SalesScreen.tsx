@@ -770,8 +770,9 @@ export default function SalesScreen() {
           <div className="section-title">キャストバック集計</div>
           <div className="cast-table">
             <div className={`cast-head ${showFullCast ? '' : 'mgr'}`}>
-              <span>キャスト</span><span>卓数</span><span>売上</span><span>バック</span><span>大入</span><span>勤務時間</span>
+              <span>キャスト</span><span>卓数</span><span>売上</span><span>バック</span><span>勤務時間</span>
               {showFullCast && <><span>通算時給</span><span>本給</span><span>日払い</span><span>源泉徴収</span><span>渡す残額</span></>}
+              <span>大入</span>
             </div>
             {castRows.map((c) => {
               const w = laborByName.get(c.name)
@@ -782,7 +783,6 @@ export default function SalesScreen() {
                   <span>{c.txCount}件</span>
                   <span>¥{c.salesAmount.toLocaleString()}</span>
                   <span className="back-badge">¥{c.backAmount.toLocaleString()}</span>
-                  <span className="oiri-badge">{c.oiriAmount > 0 ? `¥${round10(c.oiriAmount).toLocaleString()}` : '—'}</span>
                   <span>{w ? fmtWorkMin(w.min) : '—'}</span>
                   {showFullCast && <>
                     <span>{w && w.labor > 0 ? `¥${Math.round(w.labor).toLocaleString()}` : '—'}</span>
@@ -791,13 +791,13 @@ export default function SalesScreen() {
                     <span>{cc.withhold > 0 ? `−¥${cc.withhold.toLocaleString()}` : '—'}</span>
                     <span className="payout-cell">¥{round10(cc.payout).toLocaleString()}</span>
                   </>}
+                  <span className="oiri-badge">{c.oiriAmount > 0 ? `¥${round10(c.oiriAmount).toLocaleString()}` : '—'}</span>
                 </div>
               )
             })}
             <div className={`cast-row-item cast-total ${showFullCast ? '' : 'mgr'}`}>
               <span>合計</span><span></span><span></span>
               <span className="back-badge">¥{totalBack.toLocaleString()}</span>
-              <span className="oiri-badge">{summary.totalOiri > 0 ? `¥${round10(summary.totalOiri).toLocaleString()}` : '—'}</span>
               <span></span>
               {showFullCast && <>
                 <span>¥{Math.round(totalLabor).toLocaleString()}</span>
@@ -806,6 +806,7 @@ export default function SalesScreen() {
                 <span>{totalWithhold > 0 ? `−¥${totalWithhold.toLocaleString()}` : ''}</span>
                 <span className="payout-cell">¥{round10(totalPayout).toLocaleString()}</span>
               </>}
+              <span className="oiri-badge">{summary.totalOiri > 0 ? `¥${round10(summary.totalOiri).toLocaleString()}` : '—'}</span>
             </div>
           </div>
           {showFullCast && (
