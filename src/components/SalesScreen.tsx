@@ -80,7 +80,10 @@ export default function SalesScreen() {
   const [drinkPct, setDrinkPct] = useState(String(Math.round(drinkBackRate * 100)))
   const [backMin, setBackMin] = useState(String(backThreshold))
   // 大入の原資（今日時点で有効な設定の金額を初期値に）。閾値15万/25万は固定・金額のみ編集可。
-  const oiriNow = oiriConfigOn(oiriTiers, todayStr()) ?? DEFAULT_OIRI_TIER
+  // 保存済み設定が今日時点で無いときは DEFAULT_OIRI_TIER を初期表示に使う＝欄に数字は見えるが未保存。
+  const oiriSavedNow = oiriConfigOn(oiriTiers, todayStr())   // null＝今日有効な保存設定なし（＝大入は実質0）
+  const oiriUnsaved = oiriSavedNow === null
+  const oiriNow = oiriSavedNow ?? DEFAULT_OIRI_TIER
   const [oiri1, setOiri1] = useState(String(oiriNow.tier1Amount))
   const [oiri2, setOiri2] = useState(String(oiriNow.tier2Amount))
   const [taxPct, setTaxPct] = useState(String(Math.round(taxRate * 100)))
@@ -640,6 +643,11 @@ export default function SalesScreen() {
               </div>
             </div>
             <div className="cat-rate-title">大入（おおいり）の原資</div>
+            {oiriUnsaved && (
+              <div className="oiri-unsaved-note">
+                <i className="ti ti-alert-triangle" aria-hidden /> 未設定です。下の金額は初期値の表示だけで、まだ保存されていません（このままだと大入は 0 のまま）。<strong>「保存」を押すと今日（{todayStr().replace(/-/g, '/')}）以降の営業日から大入が有効</strong>になります。過去の営業日には遡及しません。
+              </div>
+            )}
             <div className="fee-row">
               <span className="fee-row-lbl"><i className="ti ti-confetti" aria-hidden /> 1日の売上 15万円以上で</span>
               <div className="fee-input-wrap">
