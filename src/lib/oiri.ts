@@ -49,18 +49,30 @@ export function perCastSales(txs: Transaction[]): Map<string, number> {
 }
 
 // 1営業日分の大入をキャスト別に算出する。
-//   pool = 原資（0/2万/3万）、各キャスト = pool × (そのキャストの売上 / 売上合計)
-// 返り値：キャスト別の大入(円・四捨五入) と その日の大入合計。
+//   pool = 原資（0/2万/3万）。閾値判定は「その日の売上合計(dayTotal)」で行うが、
+//   配分は「担当がついた売上の合計(base)」を分母にして満額を山分けする
+//   （＝担当未設定の売上があっても原資が蒸発せず、合計は常に pool に一致する）。
+//   端数は最大剰余法で配り、余り1円は売上シェアの大きいキャストへ寄せる。
+// 返り値：キャスト別の大入(円) と その日の大入合計(= pool, 担当売上がある場合)。
 export function oiriForDay(txs: Transaction[], cfg: OiriTier | null): { perCast: Map<string, number>; total: number } {
   const dayTotal = txs.reduce((a, t) => a + t.total, 0)
   const pool = oiriPool(dayTotal, cfg)
   const perCast = new Map<string, number>()
-  if (pool <= 0 || dayTotal <= 0) return { perCast, total: 0 }
+  if (pool <= 0) return { perCast, total: 0 }
+  const sales = [...perCastSales(txs)].filter(([, s]) => s > 0)
+  const base = sales.reduce((a, [, s]) => a + s, 0)
+  if (base <= 0) return { perCast, total: 0 } // 担当がついた売上が無ければ配りようがない
+  // 原資を担当売上シェアで配分（まず切り捨て→余りを frac の大きい順に+1円）。
+  const rows = sales.map(([name, s]) => {
+    const exact = (pool * s) / base
+    const floor = Math.floor(exact)
+    return { name, s, floor, frac: exact - floor }
+  })
+  let remainder = pool - rows.reduce((a, r) => a + r.floor, 0)
+  rows.sort((a, b) => b.frac - a.frac || b.s - a.s || a.name.localeCompare(b.name))
+  for (let i = 0; i < rows.length && remainder > 0; i++, remainder--) rows[i].floor += 1
   let total = 0
-  for (const [name, sales] of perCastSales(txs)) {
-    const amt = Math.round((pool * sales) / dayTotal)
-    if (amt !== 0) { perCast.set(name, amt); total += amt }
-  }
+  for (const r of rows) if (r.floor !== 0) { perCast.set(r.name, r.floor); total += r.floor }
   return { perCast, total }
 }
 
